@@ -6,7 +6,7 @@ package Class::Array::WithDBI;
 # (christian jaeger, cesar keller, philipp suter, peter rohner)
 # Published under the terms of the GNU General Public License
 #
-# $Id: WithDBI.pm,v 1.1 2002/03/09 18:26:51 chris Exp $
+# $Id: WithDBI.pm,v 1.2 2002/03/10 17:28:02 chris Exp $
 
 =head1 NAME
 
@@ -38,22 +38,22 @@ sub create_sthreader {
 		my $self=shift;
 		my $class= ref($self) or croak("$methodname: Object method called without object");
 		my $fields= $sth->{NAME} or Carp::croak("could not get NAME hash from statement handle - did you execute it? Stopped");
-		my $lookuphash= do {
-			my $calling_class= caller;
-			if ($calling_class eq $class) { # creation of sthreader in class itself. So we also want protected fields and our own private fields.
-				if (*{"${class}::CLASS_ARRAY_NAMEHASH"}{HASH}) {
-					*{"${class}::CLASS_ARRAY_NAMEHASH"}{HASH}
-				} else {
-					$class->create_namehash(1, $calling_class);
-				}
-			} else { # we create the sthreader from outside the class.    Should we distinguish whether we have inherited that class, or are completely outside so we don't know protected fields?
-				if ($calling_class->isa($class)) {
-					$class->create_namehash(1, $calling_class); # $class ne $calling_class
-				} else {
-					$class->create_namehash
-				}
-			}
-		};
+		my $lookuphash= $class->class_array_namehash; #do {
+#			my $calling_class= caller;
+# 			if ($calling_class eq $class) { # creation of sthreader in class itself. So we also want protected fields and our own private fields.
+# 				if (*{"${class}::CLASS_ARRAY_NAMEHASH"}{HASH}) {
+# 					*{"${class}::CLASS_ARRAY_NAMEHASH"}{HASH}
+# 				} else {
+# 					$class->create_namehash(1, $calling_class);
+# 				}
+# 			} else { # we create the sthreader from outside the class.    Should we distinguish whether we have inherited that class, or are completely outside so we don't know protected fields?
+# 				if ($calling_class->isa($class)) {
+# 					$class->create_namehash(1, $calling_class); # $class ne $calling_class
+# 				} else {
+# 					$class->create_namehash
+# 				}
+# 			}
+#		};
 
 		my $idx;
 		my $retidx=0;

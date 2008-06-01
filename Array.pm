@@ -6,10 +6,10 @@ package Class::Array;
 # (christian jaeger, cesar keller, philipp suter, peter rohner)
 # Published under the same terms as perl itself (i.e. Artistic license/GPL)
 #
-# $Id: Array.pm,v 1.14 2002/03/09 18:26:50 chris Exp $
+# $Id: Array.pm,v 1.15 2002/03/10 17:28:01 chris Exp $
 
 
-$VERSION = '0.04pre3';
+$VERSION = '0.04pre4';
 
 use strict;
 use Carp;
@@ -111,11 +111,7 @@ sub import {
 		my $counter=0; ##PS. könnte bei 1 anfangen und ins arrayelement 0 was anderes stopfen...
 		create_fields_and_bless_class ($calling_class, $counter, \@newpublicfields, \@newprotectedfields, \@newprivatefields, $class);
 		if ($namehash) {
-			no strict 'refs';
-			*{"${calling_class}::CLASS_ARRAY_NAMEHASH"}= $calling_class->create_namehash(1,$calling_class);
-			if ($namehash ne '1' and $namehash ne 'CLASS_ARRAY_NAMEHASH') { # create alias
-				*{"${calling_class}::$namehash"}= *{"${calling_class}::CLASS_ARRAY_NAMEHASH"}{HASH};
-			}
+			$calling_class->class_array_namehash($namehash,1,$calling_class,1);
 		}
 
 	} elsif ($flag_extend) {  # Inherit a class
@@ -129,25 +125,15 @@ sub import {
 				$flag_nowarn, !$flag_fields);
 		}
 		if ($namehash) {
-			no strict 'refs';
-#warn "DEBUG  caller is '$calling_class' but class is '$class'" unless $calling_class eq $class;
-			*{"${calling_class}::CLASS_ARRAY_NAMEHASH"}= $calling_class->create_namehash(1,$calling_class);
-			if ($namehash ne '1' and $namehash ne 'CLASS_ARRAY_NAMEHASH') { # create alias
-				*{"${calling_class}::$namehash"}= *{"${calling_class}::CLASS_ARRAY_NAMEHASH"}{HASH};
-			}
+			$calling_class->class_array_namehash($namehash,1,$calling_class,1);
 		}
 
 	} else {  # 'normal' use of a class without inheriting it.
 		croak "$class is of no use without defining fields on top of it" unless defined ${"${class}::_CLASS_ARRAY_COUNTER"}; # don't simply test '$class eq __PACKAGE__' since this would stop one to extent Class::Array itself.
 		alias_fields ($class, $calling_class, $flag_onlyfields ? { map { $_=> 1 } @only_fields } : undef, 
 			$flag_nowarn, 0);
-		if ($namehash) { # import name lookup hash
- 			no strict 'refs';
-# 			unless (*{"${class}::CLASS_ARRAY_NAMEHASH"}{HASH}) {
-# 				$class->create_name_lookup_hash;
-# 			}
-# 			*{"${calling_class}::$namehash"}= *{"${class}::CLASS_ARRAY_NAMEHASH"}{HASH};
-			*{"${calling_class}::$namehash"}= $class->create_namehash();
+		if ($namehash) { # create (if needed) and import name lookup hash (and cache it)
+			$class->class_array_namehash($namehash,0,$calling_class,1);
 		}
 	}
 	
@@ -190,35 +176,79 @@ sub alias_fields {
 	} # else something is strange, isn't it? ##
 }	
 
-sub create_namehash { ##replaces create_name_lookup_hash
+#use Carp 'cluck';
+
+sub class_array_namehash { ##replaces create_name_lookup_hash
 # Aufruf a) von neuem class, um eigene UND obenstehende reinzukriegen.  b) von outer, um nur public von der class zu kriegen.
 # Maybe we should also take optional $hashname and $cachehash arguments and put the hash HERE into the CLASS_ARRAY_NAMEHASH var and do aliases
 	my $class=shift;
-	my ($flag_inherit, $calling_class, $incomplete_hashref) =@_; # flag_inherit sagt quasi "ich bin n member und will die protected von oberhalb und meine eigenen protected + private sehen."
+#cluck "DEBUG namehash" if DEBUG;
+	my ($hashname, $flag_inherit, $calling_class, $flag_cachehash, $incomplete_hashref) =@_; # flag_inherit sagt quasi "ich bin n member und will die protected von oberhalb und meine eigenen protected + private sehen."
+	$calling_class= caller unless defined $calling_class;
+	$flag_inherit= $calling_class->isa($class) unless defined $flag_inherit; ##korrekt?
+warn "flag_inherit=$flag_inherit, calling_class=$calling_class, class=$class" if DEBUG;
 	no strict 'refs';
-	my $hashref= $incomplete_hashref ? $incomplete_hashref : {};
-	my $superclass= do {
-		my $isaref= *{"${class}::ISA"}{ARRAY};
-		if ($isaref and @$isaref == 1) {
-			$isaref->[0]
+	my $hashref;
+	# check if not already cached:
+	if ($hashref= do {
+		if ($flag_inherit) {
+			*{"${calling_class}::CLASS_ARRAY_NAMEHASH"}{HASH}
 		} else {
-			croak __PACKAGE__.": Error: class $class doesn't have a valid \@ISA (multiple inheritance is not supported for Class::Array!)";
+			*{"${class}::_CLASS_ARRAY_NAMEHASHFOREXTERNALUSE"}{HASH}
 		}
-	};
-	if (defined ${"${superclass}::_CLASS_ARRAY_COUNTER"}) {
-		$superclass->create_namehash($flag_inherit, $calling_class, $hashref); ## eigentlich würd ein flag anstelle calling_class ja reichen.
+	}) {
+		# already done
+		warn "Using cached namehash for '$class'" if DEBUG;
+	} else {
+		# need to create it
+		$hashref= $incomplete_hashref ? $incomplete_hashref : {};
+		my $superclass= do {
+			my $isaref= *{"${class}::ISA"}{ARRAY};
+			if ($isaref and @$isaref == 1) {
+				$isaref->[0]
+			} else {
+				croak __PACKAGE__.": Error: class $class doesn't have a valid \@ISA (multiple inheritance is not supported for Class::Array!)";
+			}
+		};
+		if (defined ${"${superclass}::_CLASS_ARRAY_COUNTER"}) {
+warn "DEBUG: going to call $superclass->class_array_namehash(undef, $flag_inherit, $calling_class, 0, \$hashref) where hash has ".(keys %$hashref)." keys" if DEBUG;
+			$superclass->class_array_namehash(undef, $flag_inherit, $calling_class, 0, $hashref); ## eigentlich würd ein flag anstelle calling_class ja reichen.
+warn "DEBUG: now hash has ".(keys %$hashref)." keys" if DEBUG;
+		}
+		for (@{"${class}::_CLASS_ARRAY_PUBLIC_FIELDS"}, 
+			($flag_inherit ? @{"${class}::_CLASS_ARRAY_PROTECTED_FIELDS"}: ()),
+			(($flag_inherit and $calling_class eq $class) ? @{"${class}::_CLASS_ARRAY_PRIVATE_FIELDS"}: ())
+		) { 
+			if (exists $hashref->{$_}) {	
+				die "???????FEHLER DUPLIKAT KEY für '$_' in '$class'";##
+			}
+			$hashref->{$_}= eval "${class}::$_";
+		}
+		# save it?
+		if (defined($hashname)&& $hashname ne '1' or $flag_cachehash) {
+			if ($flag_inherit) {
+				*{"${calling_class}::CLASS_ARRAY_NAMEHASH"}= $hashref;
+warn "DEBUG: saved namehash as ${calling_class}::CLASS_ARRAY_NAMEHASH" if DEBUG;
+			} else {
+				*{"${class}::_CLASS_ARRAY_NAMEHASHFOREXTERNALUSE"}= $hashref;
+warn "DEBUG: saved namehash as ${class}::_CLASS_ARRAY_NAMEHASHFOREXTERNALUSE" if DEBUG;
+			}
+		} 
 	}
-	for (@{"${class}::_CLASS_ARRAY_PUBLIC_FIELDS"}, 
-		($flag_inherit ? @{"${class}::_CLASS_ARRAY_PROTECTED_FIELDS"}: ()),
-		(($flag_inherit and $calling_class eq $class) ? @{"${class}::_CLASS_ARRAY_PRIVATE_FIELDS"}: ())
-	) { 
-		if (exists $hashref->{$_}) {	
-			die "???????FEHLER DUPLIKAT KEY für '$_' in '$class'";##
-		}
-		$hashref->{$_}= eval "${class}::$_";
+	# create alias for it?
+	if (defined($hashname) and $hashname ne '1' and (!$flag_inherit or $hashname ne 'CLASS_ARRAY_NAMEHASH')) {
+		*{"${calling_class}::$hashname"}= $hashref;
 	}
 	$hashref
-}	
+}
+
+sub class_array_indices {
+	my $class=shift;
+	my $hash= $class->class_array_namehash(undef,undef,caller); # is is required to get caller already here!, it would be Class::Array otherwise
+#use Data::Dumper;
+#warn "class_array_indices bekam ".Dumper($hash);
+	map { exists $hash->{$_} ? $hash->{$_} : confess "class_array_indices: '$_': no such field (known in your namespace)" } @_;
+}
 
 sub transport {
 	my ($items, $class, $calling_class, $flag_nowarn)=@_;
@@ -509,13 +539,27 @@ to get a hash with the given name into your namespace that has the field
 name strings as keys and the array index as value.
 
 Use this only if needed since it takes some time to create the hash.
-(Currently there's no caching of partial stages of the hash in superclasses,
-so memory is not a concern.)
 
 Note that the hash only has the fields that are accessible to you.
 
-(You could use the reverse of the hash to get the field names for an index,
-i.e. for debugging.)
+You could use the reverse of the hash to get the field names for an index,
+i.e. for debugging.
+
+There's also a C<class_array_namehash> class method with which you can create the hash 
+(or get the cached copy of it) at a later time:
+
+ class->class_array_namehash( [ aliasname [, some more args ]] )
+
+This returns a reference to the hash. Depending on whether you are in a
+class inheriting from 'class' or not, or whether you *are* the 'class' or not,
+you will get a hash containing protected (and your private) fields or not.
+If 'aliasname' is given, the hash is imported into your namespace with that name.
+
+To get a list of indices for a list of field names, there is also a method:
+
+ class->class_array_indices( list of fieldnames )
+
+This will croak if a field doesn't exist or is not visible to you.
 
 =back
 
