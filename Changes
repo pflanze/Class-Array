@@ -1,5 +1,10 @@
 Revision history for Perl extension Class::Array.
 
+0.05pre5  
+	- ucfirstletter / lcfirstletter instead of ucfirst / lcfirst
+	- ç unfinished dump routine which should pretty-dump obj.
+	- end Package routine returns true so it can be the last in a module.
+
 
 0.05pre4  Mon,  1 Nov 2004 21:34:02 +0100
 	- introduced class_array_conformize conformize-fieldname

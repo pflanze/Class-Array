@@ -9,7 +9,7 @@ package Class::Array;
 # $Id: Array.pm,v 1.26 2003/04/11 16:49:12 chris Exp $
 
 
-$VERSION = '0.05pre4';
+$VERSION = '0.05pre5';
 
 use strict;
 use Carp;
@@ -485,7 +485,7 @@ sub createaccessors {
 #    warn "createaccessors: for '$calling_class', namehash=",Dumper($namehash),", public= ",Dumper($public),", publica=",Dumper($publica);
     for (@$public, @$publica) {
 #	warn "loop: $_";
-	my $methodbasename= lcfirst($_);
+	my $methodbasename= lcfirstletter($_);
 	if (not defined *{"${calling_class}::$methodbasename"}{CODE}) {
 	    *{"${calling_class}::$methodbasename"} = eval 'sub { shift->['.$namehash->{$_}.'] }';
 	    die if $@;
@@ -502,6 +502,7 @@ sub createaccessors {
 sub end {# or finalize or so.
     my $calling_class=caller;
     createaccessors($calling_class);
+    1; # so that the end call can be the last statement in a module.
 }
 
 # "callback" on reading the class.  ps. this should not be done by a method here, but in a different axe (would that be mop like?)
@@ -510,11 +511,26 @@ sub class_array_conformize {
     # if a all-lowercase fieldname is given, upcase the first letter
     my ($name)=@_;
     if (lc($name) eq ($name)) {
-	ucfirst($name)
+	ucfirstletter($name)
     } else {
 	$name
     }
 }
+
+# those are functions and should be in their own namespace
+sub ucfirstletter {
+    my ($str)=@_;
+    $str=~ s/([a-zA-Z])/uc($1)/se; # or warn ... but we don't care here.
+#    warn "ucfirstletter: @_ -> $str";
+    $str;
+}
+sub lcfirstletter {
+    my ($str)=@_;
+    $str=~ s/([a-zA-Z])/lc($1)/se; # or warn ... but we don't care here.
+#    warn "lcfirstletter: @_ -> $str";
+    $str;
+}
+
 
 # default constructor:
 sub new {
@@ -529,6 +545,21 @@ sub clone {
 }
 # default destructor: (this is needed so subclasses can call ->SUPER::DESTROY regardless whether there is one or not)
 sub DESTROY {
+}
+
+
+sub dump {
+    my $s=shift;
+    # eruiere visible fields
+    my $caller=caller;
+    #my $namehash= $s->class_array_namehash(undef,undef,$caller);
+    # nope. mannn muss doch schon was geben?
+    # all publicly available fields only?
+    # oder soll ich echt einfach durch alle Felder gehen, sie dann nach priv/prot/publ zusammenfassen öh  unddann ausgeben regardless of feldname? fully qualified feldname geben?
+    # eigentlich will ich ne darstellung  mit feld konstanten? non fully qual optional
+    die "unfinishedç"
+#    use Data::Dumper;
+#    Dumper $namehash
 }
 
 1;
