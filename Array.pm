@@ -6,10 +6,10 @@ package Class::Array;
 # (christian jaeger, cesar keller, philipp suter, peter rohner)
 # Published under the same terms as perl itself (i.e. Artistic license/GPL)
 #
-# $Id: Array.pm,v 1.19 2002/04/24 16:37:57 chris Exp $
+# $Id: Array.pm,v 1.20 2002/05/17 12:06:52 chris Exp $
 
 
-$VERSION = '0.04pre17';
+$VERSION = '0.04pre18';
 
 use strict;
 use Carp;

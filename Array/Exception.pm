@@ -6,7 +6,7 @@ package Class::Array::Exception;
 # (christian jaeger, cesar keller, philipp suter, peter rohner)
 # Published under the terms of the GNU General Public License
 #
-# $Id: Exception.pm,v 1.9 2002/04/27 23:22:12 chris Exp $
+# $Id: Exception.pm,v 1.10 2002/05/17 12:06:52 chris Exp $
 
 =head1 NAME
 
