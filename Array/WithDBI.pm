@@ -6,7 +6,7 @@ package Class::Array::WithDBI;
 # (christian jaeger, cesar keller, philipp suter, peter rohner)
 # Published under the terms of the GNU General Public License
 #
-# $Id: WithDBI.pm,v 1.2 2002/03/10 17:28:02 chris Exp $
+# $Id: WithDBI.pm,v 1.4 2002/03/16 01:18:51 chris Exp $
 
 =head1 NAME
 
@@ -27,7 +27,7 @@ no strict 'refs';
 
 sub create_sthreader {
 	my $class=shift;
-	croak "Class method create_set_from_sth called with a reference" if ref $class;
+	croak "Class method create_sthreader called with a reference" if ref $class;
 	my $methodname=shift or croak "Missing methodname argument for create_set_from_sth";
 	my $sth=shift; ref $sth or croak "Missing dbi statement handle object as 2nd parameter";
 	# the remaining arguments is a list with values to return instead of putting into the object
@@ -38,7 +38,7 @@ sub create_sthreader {
 		my $self=shift;
 		my $class= ref($self) or croak("$methodname: Object method called without object");
 		my $fields= $sth->{NAME} or Carp::croak("could not get NAME hash from statement handle - did you execute it? Stopped");
-		my $lookuphash= $class->class_array_namehash; #do {
+		my $lookuphash= $class->class_array_namehash(undef,undef,scalar caller); #do {
 #			my $calling_class= caller;
 # 			if ($calling_class eq $class) { # creation of sthreader in class itself. So we also want protected fields and our own private fields.
 # 				if (*{"${class}::CLASS_ARRAY_NAMEHASH"}{HASH}) {

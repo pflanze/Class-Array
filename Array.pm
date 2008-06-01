@@ -6,10 +6,10 @@ package Class::Array;
 # (christian jaeger, cesar keller, philipp suter, peter rohner)
 # Published under the same terms as perl itself (i.e. Artistic license/GPL)
 #
-# $Id: Array.pm,v 1.15 2002/03/10 17:28:01 chris Exp $
+# $Id: Array.pm,v 1.17 2002/03/11 23:29:56 chris Exp $
 
 
-$VERSION = '0.04pre4';
+$VERSION = '0.04pre5';
 
 use strict;
 use Carp;
@@ -96,7 +96,7 @@ sub import {
 		}
 	}
 	
-	#if ($flag_namehash && ! defined $namehash) {
+	#if ($flag_namehash && ! $namehash) {
 	#	croak __PACKAGE__.": missing argument to -namehash option";
 	#} els
 	# nein, es soll undef erlaubt sein für den Fall von fields/inherit, dann einfach kein alias kreieren?
@@ -225,7 +225,7 @@ warn "DEBUG: now hash has ".(keys %$hashref)." keys" if DEBUG;
 			$hashref->{$_}= eval "${class}::$_";
 		}
 		# save it?
-		if (defined($hashname)&& $hashname ne '1' or $flag_cachehash) {
+		if ($hashname && $hashname ne '1' or $flag_cachehash) {
 			if ($flag_inherit) {
 				*{"${calling_class}::CLASS_ARRAY_NAMEHASH"}= $hashref;
 warn "DEBUG: saved namehash as ${calling_class}::CLASS_ARRAY_NAMEHASH" if DEBUG;
@@ -236,7 +236,7 @@ warn "DEBUG: saved namehash as ${class}::_CLASS_ARRAY_NAMEHASHFOREXTERNALUSE" if
 		} 
 	}
 	# create alias for it?
-	if (defined($hashname) and $hashname ne '1' and (!$flag_inherit or $hashname ne 'CLASS_ARRAY_NAMEHASH')) {
+	if ($hashname and $hashname ne '1' and (!$flag_inherit or $hashname ne 'CLASS_ARRAY_NAMEHASH')) {
 		*{"${calling_class}::$hashname"}= $hashref;
 	}
 	$hashref
