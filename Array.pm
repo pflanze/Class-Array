@@ -9,13 +9,13 @@ package Class::Array;
 # $Id: Array.pm,v 1.14 2002/03/09 18:26:50 chris Exp $
 
 
-$VERSION = '0.04pre2';
+$VERSION = '0.04pre3';
 
 use strict;
 use Carp;
 
 #use constant DEBUG=>0;
-sub DEBUG () {0};
+sub DEBUG () {$ENV{CLASS_ARRAY_DEBUG}||0};
 
 #use enum qw(PUBLIC PROTECTED PRIVATE);
 sub PUBLIC () {0}; sub PROTECTED () {1}; sub PRIVATE () {2}; # enum is not in the base perl 5.005 dist
@@ -23,6 +23,8 @@ sub PUBLIC () {0}; sub PROTECTED () {1}; sub PRIVATE () {2}; # enum is not in th
 sub import {
 	my $class=shift;
 	my $calling_class= caller;
+	
+	warn "importing '$class' to '$calling_class'" if DEBUG;
 	
 	# sort out arguments:
 	my (@normal_import, @only_fields, @newpublicfields, @newprotectedfields, @newprivatefields);
@@ -575,7 +577,8 @@ store in your object's fields.)
 =item * To avoid name conflicts, always use member names starting with an
 uppercase letter (and the remaining part in mixed case, so to distinguish
 from other constants), and use lowercase names for your methods / subs.
-Define fields private, if you don't need them to be accessible publically.
+Define fields private, if you don't need them to be accessible outside 
+your class.
 
 =back
 
@@ -601,6 +604,19 @@ There is also another helper module for array classes (on CPAN),
 L<Class::ArrayObjects|Class::ArrayObjects> by Robin Berjon. I didn't know
 about his module at the time I wrote Class::Array. You may want to have a
 look at it, too.
+
+=head1 FAQ
+
+(Well it's not yet one but I put this in here before it becomes one:)
+
+=over 4
+
+=item Q: Why does perl complain with 'Bareword "Foo" not allowed' when I have defined Foo as -public in class X and I have a 'use X;' in my class Y?
+
+A: Could it be there is a line 'use Y;' in your X module and you have placed it before defining X's fields?
+(See also "IMPORTANT" section.)
+
+=back
 
 =head1 AUTHOR
 
