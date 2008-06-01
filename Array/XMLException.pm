@@ -55,11 +55,11 @@ sub xml_escape {
 
 sub as_errorxml {
 	my $self=shift;
-	my $i=1;
-	'<error><file>' .
+	my ($i=1,$j=1);
+	'<error><type>'.xml_escape(ref($self)).'</type><file>' .
 	xml_escape($self->[ExceptionFile]) . '</file><msg>' .
 	xml_escape($self->text) . '</msg>' .
-	'<stack_trace><bt level="0">'.
+	'<rethrown><bt level="0">'. ### really use 'bt'?
 	'<file>' . xml_escape($self->[ExceptionFile]) . '</file>' .
 	'<line>' . xml_escape($self->[ExceptionLine]) . '</line>' .
 	'</bt>'. ($self->[ExceptionRethrown] ? join("",
@@ -68,7 +68,25 @@ sub as_errorxml {
 			'<line>' . xml_escape($_->[2]) . '</line>' .
 			'</bt>' } @{$self->[ExceptionRethrown]}
 	) : "") .
-	'</stack_trace></error>'
+	'</rethrown>'
+	.($self->[ExceptionStacktrace] ?
+		'<stack_trace>'.
+# 		'<bt level="0">'.
+# 		'<file>' . xml_escape($self->[ExceptionFile]) . '</file>' .
+# 		'<line>' . xml_escape($self->[ExceptionLine]) . '</line>' .
+# 		'</bt>'. ($self->[ExceptionRethrown] ? 
+		join("",
+		map { '<bt level="' . $j++ . '">' .
+				'<file>' . xml_escape($_->[0]) . '</file>' .
+				'<line>' . xml_escape($_->[1]) . '</line>' .
+				'<what>' . xml_escape($_->[2]) . '</what>' .
+				'</bt>' } $self->stacktrace_loa
+		)
+#		 : "")
+		.'</stack_trace>'
+		: ''
+	)
+	.'</error>'
 }
 
 1;
