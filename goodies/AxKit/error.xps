@@ -1,0 +1,31 @@
+<%
+	$t->{error}{pre} = "";
+	$t->{error}{post} = ""; 
+	$t->{type}{pre} = '  <font color="#ff0000"><b>';
+	$t->{type}{post} = '</b></font> exception <br>';
+	$t->{file}{pre} = "  at <b>\n   ";
+	$t->{file}{post} = "\n  </b>\n"; 
+	$t->{msg}{pre} = "  <br><br>Error: <br><b><pre>\n";
+	$t->{msg}{post} = "\n</pre></b>\n"; 
+	$t->{line}{pre} = "  line <b>\n   ";
+	$t->{line}{post} = "\n  </b><br>\n"; 
+	$t->{what}{pre} = " called ";
+	$t->{rethrown}{pre} = "  <br><br>Rethrown: <table bgcolor=#662222 cellpadding=10 border=0><tr><td>\n   ";
+	$t->{rethrown}{post} = "\n  </td></tr></table>\n"; 
+	$t->{stack_trace}{pre} = "  <br><br>Stacktrace: <table bgcolor=#662222 cellpadding=10 border=0><tr><td>\n <pre>";
+	$t->{stack_trace}{post} = "</pre></td></tr></table>\n"; 
+	$t->{stack_trace}{testcode}= sub {
+    	 #my ($node,$t)=@_;  hmm, it doesn't seem to work with this line
+    	 $t->{file}{pre} = "";
+    	 $t->{file}{post}= "";
+    	 $t->{line}{pre} = " line ";
+    	 $t->{line}{post}= "";
+    	 $t->{what}{pre}= " called ";
+    	 $t->{what}{post}= "";
+    	 1;
+	};
+	$t->{bt}{pre} = "";
+	$t->{bt}{post} = "\n";
+%>
+<html><body bgcolor=550000 text="#eeeeee"><H2>There seems to be a little PROBLEM </H2>
+<%= apply_templates('/') %> <b> ...Sorry... </b></body></html>

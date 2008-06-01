@@ -6,7 +6,7 @@ package Class::Array::XMLException;
 # (christian jaeger, cesar keller, philipp suter, peter rohner)
 # Published under the terms of the GNU General Public License
 #
-# $Id: XMLException.pm,v 1.1 2002/04/26 16:22:12 chris Exp $
+# $Id: XMLException.pm,v 1.2 2002/04/27 19:03:41 chris Exp $
 
 =head1 NAME
 

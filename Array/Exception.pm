@@ -6,7 +6,7 @@ package Class::Array::Exception;
 # (christian jaeger, cesar keller, philipp suter, peter rohner)
 # Published under the terms of the GNU General Public License
 #
-# $Id: Exception.pm,v 1.7 2002/04/26 16:20:57 chris Exp $
+# $Id: Exception.pm,v 1.9 2002/04/27 23:22:12 chris Exp $
 
 =head1 NAME
 
@@ -63,8 +63,11 @@ about the namespace pollution, should I keep them protected?):
                         arrayrefs containing package/file/line
                         of the 'caller' of rethrow[/throw];
                         each rethrow[/throw] pushes another row)
-    ExceptionStacktrace May be filled upon calling 'throw' or 'ethrow'
-						(see below)
+    ExceptionStacktrace May be filled upon calling 'throw' or 
+                        'ethrow' (see below)
+    ExceptionStacktraceHasfullargs 
+                        Is set tostacktrace_keepfullargs (see 
+                        below) by throw/ethrow 
 
 The class is overloaded so you can simply access $@ in string
 or number context and get a nice error summary or the ExceptionValue
@@ -85,39 +88,73 @@ prior to throwing the exception using the set_stacktrace() class method.
 These are the same except that throw actually calls die, and
 that throw always records the package/file/line where it is called from
 whereas new only does this if caller_i is defined. caller_i defines 
-which caller (how many levels up the call stack) should be recorded.
+which caller should be recorded (how many call frames should be
+skipped).
 
 NOTE: you can use throw as an object method as well, it then behaves
-identical to rethrow. (I find it better to explicitely use "rethrow" 
+identically to rethrow. (I find it better to explicitely use "rethrow" 
 for this purpose though, since it expresses better what it does.
 'throw' is only a hybrid class/object method since
 Error.pm uses 'throw' to rethrow an exception (as does C++).)
 
-=item set_stacktrace( false/true [, true/false [, 0/stacktrace_nargs [, stacktrace_maxarglen]]] )
+=item set_stacktrace( key [=> value] [, key=>value,... ] )
 
-Sets the value of $Class::Array::Exception::stacktrace [and
-$Class::Array::Exception::stacktrace_output, ...::stacktrace_nargs
-and ...::stacktrace_maxarglen].
-(Using an inheritable method seems cooler for this purpose since
+Changes stacktracing settings (the values of the Class::Array::Exception::
+package globals 
+$stacktrace_record,
+$stacktrace_output,
+$stacktrace_nargs,
+$stacktrace_maxarglen and $stacktrace_keepfullargs -- 
+using an inheritable method seems cooler for this purpose since
 users of your derived exception class don't have to remember that your
-class inherits from Class::Array::Exception.) 
+class inherits from Class::Array::Exception, and also typos will
+be discovered immediately.)
 
-First argument:
+If only a key is given, a reference to the scalar containing the
+setting is given. This allows for example to use 'local' on a value
+(my $settingref= Class::Array::Exception->set_stacktrace('record');
+local $$settingref= 1;).
+
+Description of the options:
+
+=over 4
+
+=item record
+
 false (which is the default) means that the 'ExceptionStacktrace' will not
 be set upon throwing an exception (which will be faster). 
 
-Second argument:
+=item output
+
 true (which is the default) means that the stacktrace will 
 also be included in the output of 'stringify' (if you happen to override 
 stringify, you should make it append the output of the 'stacktrace' object method)
 
-Third argument (defaults to 10):
-0 means that 'ExceptionStacktrace'
-will be set to contain only the caller information (subroutine arguments),
-a higher value means that also up to the n first subroutine arguments of each stack 
-frame will be included in 'ExceptionStacktrace' as array ref in column 10.
+=item nargs
 
-Forth argument: the maximum length output of each string subroutine argument (default: 10).
+0 means that 'ExceptionStacktrace'
+will be set to contain only the caller information (file,line,subname),
+a higher value means that also up to the n first subroutine arguments of each stack 
+frame will be included in 'ExceptionStacktrace' (as arrayref stored in column 10).
+(defaults to 8)
+
+=item maxarglen
+
+the maximum length of each string subroutine argument before truncation (default: 16).
+
+=item keepfullargs
+
+if true (and nargs>0 of course), the full 
+subroutine arguments are kept (as a copy) in ExceptionStacktrace. The default
+of false means that only a substr of strings and only the stringified representation
+of references are kept.
+Note that including the full subroutine arguments could take up much memory and
+inhibit referenced objects from being destroyed, and if
+you don't dispose of the exception object soon (i.e. because you reuse it by means of
+throw_existing) this could potentially be a problem. (On the other hand it could
+allow you to examine the arguments in detail.)
+
+=back
 
 =back
 
@@ -142,6 +179,10 @@ For caller_i see 'new'/'throw'.
 
 Pushes package, file and line where rethrow has been called from
 into ExceptionRethrown and then calls die. 
+
+=item record_stacktrace(caller_i)
+
+Used internally.
 
 =item stringify
 
@@ -170,6 +211,10 @@ Used by the 'stacktrace' method.
 
 =back
 
+=head1 SEE ALSO
+
+L<Error::Filter>
+
 =head1 AUTHOR
 
 Christian Jaeger, pflanze@gmx.ch
@@ -189,6 +234,7 @@ use Class::Array -fields=> qw(
 	ExceptionLine
 	ExceptionRethrown
 	ExceptionStacktrace
+	ExceptionStacktraceHasfullargs
 ); # ExceptionDepth   what for?
 
 
@@ -213,26 +259,43 @@ sub import {
 	}
 }
 
-use vars qw/$stacktrace $stacktrace_output $stacktrace_nargs $stacktrace_maxarglen/;
+use vars qw/$stacktrace_record $stacktrace_output $stacktrace_nargs $stacktrace_maxarglen
+		$stacktrace_keepfullargs/;
+$stacktrace_record= undef;
 $stacktrace_output=1;
-$stacktrace_nargs= 10;
-$stacktrace_maxarglen= 10;
-
+$stacktrace_nargs= 8;
+$stacktrace_maxarglen= 16;
+$stacktrace_keepfullargs= undef;
+my %settingsrefs= (
+	record=>\$stacktrace_record,
+	output=>\$stacktrace_output,
+	nargs=>\$stacktrace_nargs,
+	maxarglen=>\$stacktrace_maxarglen,
+	keepfullargs=>\$stacktrace_keepfullargs,
+);
 sub set_stacktrace {
 	my $class=shift;
-	if (@_) {
-		$stacktrace=shift;
-		if (@_) {
-			$stacktrace_output= shift;
-			if (@_) {
-				$stacktrace_nargs= shift;
-				if (@_) {
-					$stacktrace_maxarglen= shift;
-				}
-			}
+	if (@_ == 1) {
+		if (my $ref=$settingsrefs{$_[0]}) {
+			$ref
+		} else {
+			my ($p,$f,$l)=caller;
+			die "set_stacktrace: unknown key '$_[0]' at $f line $l\n";
 		}
 	} else {
-		$stacktrace
+		if (@_ % 2) {
+			my ($p,$f,$l)=caller;
+			die "set_stacktrace: uneven number of arguments at $f line $l\n";
+		}
+		while (@_) {
+			my $key=shift;
+			if (my $ref=$settingsrefs{$key}) {
+				$$ref= shift;
+			} else {
+				my ($p,$f,$l)=caller;
+				die "set_stacktrace: unknown key '$key' at $f line $l\n";
+			}
+		}
 	}
 }
 
@@ -242,7 +305,10 @@ sub new {
 	#my $self= $class->SUPER::new;
 	my $self = bless [], $class;
 	@$self[ExceptionText,ExceptionValue]= ($text,$value);
-	@$self[ExceptionPackage,ExceptionFile,ExceptionLine]= caller($caller_i) if defined $caller_i;
+	if (defined $caller_i) {
+		@$self[ExceptionPackage,ExceptionFile,ExceptionLine]= caller($caller_i) ;
+		$self->record_stacktrace($caller_i+1) if $stacktrace_record;
+	}
 	$self
 }
 
@@ -273,7 +339,7 @@ sub throw {
 		my $self = bless [], $class; # my $self= $class->SUPER::new;
 		@$self[ExceptionText,ExceptionValue]= ($text,$value);
 		@$self[ExceptionPackage,ExceptionFile,ExceptionLine]= caller($caller_i||0); ## is this a costly operation?
-		$self->save_stacktrace($caller_i||0+1) if $stacktrace;
+		$self->record_stacktrace($caller_i||0+1) if $stacktrace_record;
 		# do this   $self->[ExceptionRethrown]=[];  and then check above so throw $@ can decide if it's the first throw or not?
 		die $self
 	}
@@ -281,31 +347,52 @@ sub throw {
 
 sub throw_existing { # throw existing  (erase rethrow data before doing so)
 	my $self=shift;
-	undef $self->[ExceptionRethrown];# or $self->[ExceptionRethrown]=[];
+	undef $self->[ExceptionRethrown];# or: $self->[ExceptionRethrown]=[];
+	undef $self->[ExceptionStacktrace];
 	@$self[ExceptionPackage,ExceptionFile,ExceptionLine]= caller(@_);
-	$self->save_stacktrace($_[0]||0+1) if $stacktrace;
+	$self->record_stacktrace($_[0]||0+1) if $stacktrace_record;
 	die $self
 }
 
 *ethrow = *throw_existing{CODE};
 
-sub save_stacktrace {
+sub record_stacktrace {
 	my $self=shift;
 	my ($caller_i)=@_;
 	my $i= $caller_i + 1; # (we already got the primary caller)
 	if ($stacktrace_nargs) {
-		{ 
-			package DB; 
-			while (caller($i)) {
-				push @{$self->[Class::Array::Exception::ExceptionStacktrace]}, 
-					[ caller($i), ## should we check if caller is '(eval)' so we don't waste memory copying stale args? 8//
-						[@DB::args <= $Class::Array::Exception::stacktrace_nargs ? 
-							@DB::args 
-							: ( @DB::args[0..$Class::Array::Exception::stacktrace_nargs-1], "...")
-						] 
-					];
-				$i++ 
-			};
+		if ($self->[ExceptionStacktraceHasfullargs]= $stacktrace_keepfullargs) {
+			{ 	package DB; 
+				while (caller($i)) {
+					push @{$self->[Class::Array::Exception::ExceptionStacktrace]}, 
+						[ caller($i), ## should we check if caller is '(eval)' so we don't waste memory copying stale args? 8//
+							[@DB::args <= $Class::Array::Exception::stacktrace_nargs ? 
+								@DB::args 
+								: ( @DB::args[0..$Class::Array::Exception::stacktrace_nargs-1], "...")
+							] 
+						];
+					$i++ 
+				};
+			}
+		} else {
+			{ 	package DB; 
+				while (caller($i)) {
+					push @{$self->[Class::Array::Exception::ExceptionStacktrace]}, 
+						[ caller($i), ## should we check if caller is '(eval)' so we don't waste memory copying stale args? 8//
+							[	
+								map {
+									ref() ? 
+										"r$_"
+										: "s".substr($_,0,$Class::Array::Exception::stacktrace_maxarglen+1)
+								}
+								@DB::args <= $Class::Array::Exception::stacktrace_nargs ? 
+									@DB::args 
+									: ( @DB::args[0..$Class::Array::Exception::stacktrace_nargs-1], "...")
+							] 
+						];
+					$i++ 
+				};
+			}
 		}
 	} else {
 		while (push @{$self->[ExceptionStacktrace]}, [ caller($i) ]) { $i++ };
@@ -326,7 +413,7 @@ sub stringify {
 	.( defined($$self[ExceptionFile]) and !defined($self->[ExceptionText]) || $self->[ExceptionText]!~/\n$/s
 		? " at $self->[ExceptionFile] line $self->[ExceptionLine].\n"
 			.join("",map { "\t...rethrown at $_->[1] line $_->[2]\n" } @{$self->[ExceptionRethrown]})
-			.($stacktrace ? $self->stacktrace : "")
+			.($stacktrace_record ? $self->stacktrace : "")
 		: "")
 }
 
@@ -359,18 +446,29 @@ sub stacktrace_loa {
 							if (ref) {
 								"$_"
 							} else {
-								$c= length > $stacktrace_maxarglen ? 
-									substr($_,0,$stacktrace_maxarglen)."..."
-									: $_;
-								$c=~ /^-?[\d.]+$/s ? 
-									$c
-								: 	do{
-									$c=~ s/'/\\'/g;
-									$c=~ s/([\200-\377])/sprintf("M-%c",ord($1)&0177)/eg;
-									$c=~ s/([\0-\37\177])/sprintf("^%c",ord($1)^64)/eg;
-									"'$c'"
+								if (!$self->[ExceptionStacktraceHasfullargs] and /^r/) {
+									# once was a ref
+									substr($_,1)
+								} else {
+									if ($self->[ExceptionStacktraceHasfullargs]) {
+										$c= length > $stacktrace_maxarglen ? 
+											substr($_,0,$stacktrace_maxarglen)."..."
+											: $_;
+									} else {
+										$c= length > $stacktrace_maxarglen + 1 ? 
+											substr($_,1,$stacktrace_maxarglen)."..."
+											: substr($_,1);
+									}
+									$c=~ /^-?[\d.]+$/s ? 
+										$c
+									: 	do{
+										$c=~ s/'/\\'/g;
+										$c=~ s/([\200-\377])/sprintf("M-%c",ord($1)&0177)/eg;
+										$c=~ s/([\0-\37\177])/sprintf("^%c",ord($1)^64)/eg;
+										"'$c'"
+									}
+									# (Hmm, thread id stuff?)
 								}
-								# (Hmm, thread id stuff?)
 							}
 						} @{$_->[10]} )
 						.")"

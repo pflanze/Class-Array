@@ -1,3 +1,5 @@
 Make perl5 better for object oriented programming
 
 Fast objects with access rules and typo protection.
+Includes base classes for efficient DBI and exception handling
+(the latter designed for use with Error::Filter).
