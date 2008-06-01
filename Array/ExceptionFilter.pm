@@ -3,7 +3,7 @@ package Class::Array::ExceptionFilter;
 # copyright 2002 by christian jaeger , pflanze@gmx.ch
 # published under the same terms as perl
 #
-# $Id: ExceptionFilter.pm,v 1.4 2002/04/03 04:51:47 chris Exp $
+# $Id: ExceptionFilter.pm,v 1.5 2002/04/10 02:51:37 chris Exp $
 
 =head1 NAME
 
@@ -91,18 +91,25 @@ will be merged into the main distribution.
 
 =head1 NOTES
 
-I'm open to rename this to Error::Filter if MattS (first keeper of the namespace) thinks that's ok 
-and as soon as it is (fully or enough) backwards compatible to Error.pm
+I'm open to rename this to Error::Filter if MattS (who first made use of
+the namespace) thinks that's ok  and as soon as it is (fully or enough)
+backwards compatible to Error.pm
 
 =head1 BUGS
 
-Since this uses the not yet perfect filtering infrastructure (Filter::Simple,
-Text::Balanced), and on top of that introduces it's own lexer, I'm sure
-there are cases where it fails. One particular is here docs (bug in Filter::Simple(?);
-be sure not to put a 'try' right after a here doc, or put a semicolon before it).
-Another one is #comment\n handling: Text::Balanced doesn't care at all about comments
-when extracting strings. So be sure not to put unpaired quotes in comments.
-Tell me about other bugs you find.
+Since this uses the not yet perfect filtering infrastructure
+(Filter::Simple, Text::Balanced), and on top of that introduces it's own
+lexer, I'm sure that there are cases where it fails. The one I know of is
+HERE docs (probably a bug  in Text::Balanced) - be sure not to put a 'try'
+right after a here doc,  or put a semicolon before it). Tell me about other
+bugs you find.
+
+Another problem may be compilation performance with bigger projects. I'm
+sure that this can be improved much, but it will take some effort
+(suggestions are to rewrite Filter::Simple/  Text::Balanced to use less
+subroutine calls, to integrate their code straight into the exception
+filter so only one pass through the text is needed, or to rewrite it in C
+or C++. Another one might be to patch perl itself?).
 
 =head1 AUTHOR
 
@@ -231,14 +238,26 @@ sub transform { # pass in *references* for string and line
 				my (@catchblocks);
 				my ($otherwiseblock,$finallyblock);
 
-				my $inter= jump_afterbracket; # we *have* to copy it since it's a readonly value
+				my $inter= &jump_afterbracket; # we *have* to copy it since it's a readonly value
+#defined $inter ? warn "       inter ist defined\n" : warn "        inter ist undef !\n";
+#defined $@ ? warn "       \$\@ ist '$@'\n" : warn "        \$\@ ist undef !\n";
+if (defined $@) { # trust defined? or better use ref? or plain bool?
+	warn __PACKAGE__." warning (or really a bug of one of the filtering libraries?): $@->{error} in $filename lines $line - "
+		.($line+linesin(substr($_,$beginpos,pos($_)-$beginpos)))."\n"
+		if $^W;
+	last NEWSTATEMENT; # still let earlier modifications through?
+}
+
 				$endpos= pos($_);
 				if (DEBUG>=2) {
-				print "***  try  ***: von $beginpos - $endpos, line $line\n";
+				print "***  try  ***: von $beginpos - $endpos (length of our segment is ".length($_)."), line $line\n";
 				print "  --CODE: -------------\n";
 				print "  $inter\n";
 				print "  --/CODE -------------\n";
 				}
+# sollten $inter checken offenbar.  Was ist der richtige fehlermeldung vom balanced?
+# Dann wenn fehler, gracefully einfach returnen. (Noch ne warnung ausgebn). Hm.
+# (Weil AH wenn nich, dann ->'eval;')
 				transform(\$inter,\$line,$filename,$checknamespaces);
 				pos($_)= $endpos;
 
@@ -261,7 +280,7 @@ sub transform { # pass in *references* for string and line
 							$copy= $1.$2.$3.$5; $line+= $copy=~ tr/\n/\n/;
 							my @namespaces= split(/\s*,\s*/, $2);
 							my $error_pm_compatible= !!$4;
-							$inter= substr(jump_afterbracket,1,-1);
+							$inter= substr(&jump_afterbracket,1,-1);
 
 							print "OK GOT CATCH with namespaces (".join("),(",@namespaces).") and interpart (at line $line) '$inter'\n" if DEBUG>=2;
 							my $startline=$line;
@@ -282,7 +301,7 @@ sub transform { # pass in *references* for string and line
 						if (/\G(\s*)(?={)/sgoc) {
 							if (!defined $otherwiseblock) {
 								$copy= $1; $line+= $copy=~ tr/\n/\n/;
-								$inter= substr(jump_afterbracket,1,-1);
+								$inter= substr(&jump_afterbracket,1,-1);
 								
 								print "OK GOT OTHERWISE with interpart (at line $line) '$inter'\n" if DEBUG>=2;
 								my $startline=$line;
@@ -301,7 +320,7 @@ sub transform { # pass in *references* for string and line
 						if (/\G(\s*)(?={)/sgoc) {
 							if (!defined $finallyblock) {
 								$copy= $1; $line+= $copy=~ tr/\n/\n/;
-								$inter= substr(jump_afterbracket,1,-1);
+								$inter= substr(&jump_afterbracket,1,-1);
 								
 								print "OK GOT FINALLY with interpart (at line $line) '$inter'\n" if DEBUG>=2;
 								my $startline=$line;
@@ -411,6 +430,7 @@ sub transform { # pass in *references* for string and line
 
 FILTER_ONLY
 	codecj=> sub {
+		$|=1 if DEBUG; # so we can capture stdout+stderr together in a pipe synchronously
 		# get line number
 		my ($package,$filename,$line)= caller(3); # hmm, I'm dependant now on filter::simple not changing it's calling stack.
 		print "CALLER is $package, at $filename line $line\n" if DEBUG>=2;
