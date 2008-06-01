@@ -6,7 +6,7 @@ package Class::Array::Exception;
 # (christian jaeger, cesar keller, philipp suter, peter rohner)
 # Published under the terms of the GNU General Public License
 #
-# $Id: Exception.pm,v 1.2 2002/04/02 03:08:33 chris Exp $
+# $Id: Exception.pm,v 1.3 2002/04/02 14:28:02 chris Exp $
 
 =head1 NAME
 
@@ -125,8 +125,8 @@ use overload (
 
 sub import {
 	my $class=shift;
-	$class->SUPER::import(@_);
 	my $caller=caller;
+	$class->SUPER::import(-caller=> $caller, @_);
 	no strict 'refs';
 	if (${"${caller}::".__PACKAGE__."::filtered"}) {
 		#print "$caller Already filtered\n";
@@ -138,20 +138,21 @@ sub import {
 
 sub new {
 	my $class=shift;
-	my ($text,$value)=@_;
+	my ($text,$value,$caller_i)=@_;
 	#my $self= $class->SUPER::new;
 	my $self = bless [], $class;
 	@$self[ExceptionText,ExceptionValue]= ($text,$value);
+	@$self[ExceptionPackage,ExceptionFile,ExceptionLine]= caller($caller_i) if defined $caller_i;
 	$self
 }
 
 sub throw {
 	my $class=shift;
-	my ($text,$value)=@_;
+	my ($text,$value,$caller_i)=@_;
 	#my $self= $class->SUPER::new;
 	my $self = bless [], $class;
 	@$self[ExceptionText,ExceptionValue]= ($text,$value);
-	@$self[ExceptionPackage,ExceptionFile,ExceptionLine]= caller; ## is this a costly operation?
+	@$self[ExceptionPackage,ExceptionFile,ExceptionLine]= caller($caller_i||0); ## is this a costly operation?
 	die $self
 }
 

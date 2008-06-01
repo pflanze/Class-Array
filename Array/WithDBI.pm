@@ -6,7 +6,7 @@ package Class::Array::WithDBI;
 # (christian jaeger, cesar keller, philipp suter, peter rohner)
 # Published under the terms of the GNU General Public License
 #
-# $Id: WithDBI.pm,v 1.4 2002/03/16 01:18:51 chris Exp $
+# $Id: WithDBI.pm,v 1.5 2002/04/02 14:28:02 chris Exp $
 
 =head1 NAME
 

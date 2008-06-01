@@ -6,10 +6,10 @@ package Class::Array;
 # (christian jaeger, cesar keller, philipp suter, peter rohner)
 # Published under the same terms as perl itself (i.e. Artistic license/GPL)
 #
-# $Id: Array.pm,v 1.17 2002/03/11 23:29:56 chris Exp $
+# $Id: Array.pm,v 1.18 2002/04/02 14:28:02 chris Exp $
 
 
-$VERSION = '0.04pre6';
+$VERSION = '0.04pre7';
 
 use strict;
 use Carp;
@@ -22,15 +22,14 @@ sub PUBLIC () {0}; sub PROTECTED () {1}; sub PRIVATE () {2}; # enum is not in th
 
 sub import {
 	my $class=shift;
-	my $calling_class= caller;
-	
-	warn "importing '$class' to '$calling_class'" if DEBUG;
+	my $calling_class;
 	
 	# sort out arguments:
 	my (@normal_import, @only_fields, @newpublicfields, @newprotectedfields, @newprivatefields);
 	my $publicity= PROTECTED; # default behaviour!
 	my $namehash;
-	my ($flag_fields, $flag_extend, $flag_onlyfields, $flag_base, $flag_nowarn, $flag_namehash);
+	my ($flag_fields, $flag_extend, $flag_onlyfields, $flag_base, $flag_nowarn, $flag_namehash,
+		$flag_caller);#hmm it really starts to cry for a $i or shift approach.
 	for (@_) {
 		if ($flag_base) {
 			$flag_base=0;
@@ -38,6 +37,12 @@ sub import {
 		} elsif ($flag_namehash) {
 			$flag_namehash=0;
 			$namehash= $_;
+		} elsif ($flag_caller) {
+			$flag_caller=0;
+			$calling_class= $_;
+		} elsif ($_ eq '-caller') {
+			croak "Multiple occurrence of -caller argument" if defined $calling_class;
+			$flag_caller=1;
 		} elsif ($_ eq '-nowarn') {
 			$flag_nowarn=1;
 		} elsif ($_ eq '-fields' or $_ eq '-members') {
@@ -95,6 +100,13 @@ sub import {
 			}
 		}
 	}
+	
+	croak "Missing argument to '-caller'" if $flag_caller;
+	unless (defined $calling_class) {
+		$calling_class= caller;
+		croak "Won't import class '$class' into itself (use the -caller option to specify the export target)" if $class eq $calling_class;
+	}
+	warn "importing '$class' to '$calling_class'" if DEBUG;
 	
 	#if ($flag_namehash && ! $namehash) {
 	#	croak __PACKAGE__.": missing argument to -namehash option";
@@ -606,7 +618,8 @@ based modules.
 3.) Remember that Class::Array relies on the module import mechanism and
 thus on it's `import' method. So either don't define subroutines called
 `import' in your modules, or call SUPER::import from there after having
-stripped the arguments meant for your own import functionality.
+stripped the arguments meant for your own import functionality, and 
+specify -caller=> scalar caller() as additional arguments.
 
 4.) (Of course) remember to never `use enum' or `use constant' to define your
 field names. (`use enum' is fine however for creating *values* you
