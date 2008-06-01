@@ -9,7 +9,7 @@ package Class::Array;
 # $Id: Array.pm,v 1.26 2003/04/11 16:49:12 chris Exp $
 
 
-$VERSION = '0.05pre5';
+$VERSION = '0.05pre6';
 
 use strict;
 use Carp;
@@ -22,15 +22,25 @@ $|=1 if DEBUG;
 sub PUBLIC () {0}; sub PROTECTED () {1}; sub PRIVATE () {2}; # enum is not in the base perl 5.005 dist
 sub PUBLICA () {3}; # (new 04/10/31) public only via accessors, not via field constant export.
 
+# lexicalized copy from Chj::load:  (most of the code here should really not be in the base class of all class array based classes sigh..)
+my $load=sub {
+    for $_ (@_) {
+        my $name=$_;
+        $name=~ s|::|/|sg;
+        $name.=".pm";
+        require $name;
+    }
+};
+
 sub import {
     my $class=shift;
     my $calling_class;
     # sort out arguments:
-    my (@normal_import, @only_fields, @newpublicfields, @newpublicafields, @newprotectedfields, @newprivatefields);
+    my (@normal_import, @only_fields, @newpublicfields, @newpublicafields, @newprotectedfields, @newprivatefields, @pmixin);
     my $publicity= PROTECTED; # default behaviour!
     my $namehash;
     my ($flag_fields, $flag_extend, $flag_onlyfields, $flag_base, $flag_nowarn, $flag_namehash,
-        $flag_caller);#hmm it really starts to cry for a $i or shift approach.
+        $flag_caller, $flag_pmixin);#hmm it really starts to cry for a $i or shift approach.
     for (@_) {
         if ($flag_base) {
             $flag_base=0;
@@ -38,6 +48,10 @@ sub import {
         } elsif ($flag_namehash) {
             $flag_namehash=0;
             $namehash= $_;
+	} elsif ($flag_pmixin) {
+	    $flag_pmixin=0;
+	    push @pmixin, $_;
+	    ##(or should we actually accept as many arguments as there are non-dashed ones?)
         } elsif ($flag_caller) {
             $flag_caller=0;
             $calling_class= $_;
@@ -89,6 +103,8 @@ sub import {
             $flag_base=1;
         } elsif ($_ eq '-namehash') {
             $flag_namehash=1; ## wieso dieser hack?, warum nicht nächstes argument clobbern? Hmm.
+        } elsif ($_ eq '-pmixin') {
+            $flag_pmixin=1; #dito
         } elsif (/^-/) {
             croak __PACKAGE__.": don't understand option `$_'";
         } else {
@@ -184,6 +200,12 @@ sub import {
         }
     }
 
+    if (@pmixin) {
+	$load->(@pmixin);
+	no strict 'refs';
+	push @{$calling_class."::ISA"}, @pmixin;
+    }
+
     # 'normal' export mechanism
     for (@normal_import) {
         transport ([$_],$class,$calling_class, $flag_nowarn);
@@ -238,7 +260,7 @@ sub alias_fields {
 	    my $isaref= *{"${class}::ISA"}{ARRAY};
 	    #print STDERR "! ${class}::ISA = ".(join ",",@$isaref )."\n";
 	    if ($isaref and @$isaref >= 1) {
-		$superclass =  ${$isaref}[0];
+		$superclass =  $ {$isaref}[0];
 	    }
 	}
         $superclass or do { 
@@ -276,7 +298,7 @@ sub class_array_namehash_allprotected { # get all protected field definitions in
     return $hashref
 }
 
-sub class_array_namehash {
+sub class_array_namehash { #(cj 05/10/05: offensichtlich keine publica felder bekommbar so, egal was für flags.??)
     my $class=shift;
     my ($hashname, $flag_inherit, $calling_class, $flag_cachehash, $incomplete_hashref) =@_;
     $calling_class= caller unless defined $calling_class;
@@ -562,6 +584,37 @@ sub dump {
 #    Dumper $namehash
 }
 
+
+sub class_array_publica_fields {
+    my ($class,$result)=@_;
+    if(ref$class) {$class= ref $class} # so that it can be used as object method,too.
+    $result||=[];
+    no strict 'refs';
+    my $publica= *{"${class}::_CLASS_ARRAY_PUBLICA_FIELDS"}{ARRAY};
+    if (!$publica) {
+	croak __PACKAGE__."::class_array_publica_fields: class '$class' does not seem to be a Class::Array based class";
+    }
+    unshift @$result,@$publica;
+    # und MUSS ich noch hoch iterieren oder nicht? DOCH man muss.
+    my $superclass= *{"${class}::_CLASS_ARRAY_SUPERCLASS"}{SCALAR};
+    if ($$superclass) {# auf $superclass prüfen geht eben nicht, das ist immer ein true ref. MANN. todo oben ist das wohl überall buggy.
+	#warn "superclass '$$superclass'\n";
+	class_array_publica_fields($$superclass,$result)
+    } else {
+	@$result
+    }
+}
+
+sub dump_publica {
+    my $s=shift;
+    require Chj::singlequote;
+    "$s:\n".join("",map{
+	my $field=$_;
+	my $method=lcfirstletter $field;
+	"  $method: ".Chj::singlequote($s->$method)."\n"
+    } $s->class_array_publica_fields)
+}
+
 1;
 __END__
 
@@ -822,6 +875,7 @@ inherit from hash and array based classes, so any class aiming to be
 compatible to other classes to allow multiple inheritance  should use the
 standard hash based approach.
 
+There is now a -pmixin => class 
 Note that you can still force multiple inheritance by loading further
 subclasses yourself ('use Classname ()' or 'require Classname') and
 push()ing the additional classnames onto @ISA.
