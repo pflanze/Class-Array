@@ -6,10 +6,10 @@ package Class::Array;
 # (christian jaeger, cesar keller, philipp suter, peter rohner)
 # Published under the same terms as perl itself (i.e. Artistic license/GPL)
 #
-# $Id: Array.pm,v 1.20 2002/05/17 12:06:52 chris Exp $
+# $Id: Array.pm,v 1.22 2002/11/10 02:55:13 chris Exp $
 
 
-$VERSION = '0.04pre18b';
+$VERSION = '0.04pre19';
 
 use strict;
 use Carp;
@@ -187,10 +187,12 @@ sub alias_fields {
 			}
 		}
 		my $isaref= *{"${class}::ISA"}{ARRAY};
-		if ($isaref and @$isaref == 1) {
+		if ($isaref and @$isaref >= 1) {
 			alias_fields ( ${$isaref}[0], $calling_class, $only_fields, $flag_nowarn, $flag_inherit);
 		} else {
-			croak __PACKAGE__.": Error: class $class is set up as Class::Array type class, but doesn't have a valid \@ISA (multiple inheritance is not supported for Class::Array!)";
+			#croak __PACKAGE__.": Error: class $class is set up as Class::Array type class, but doesn't have a valid \@ISA (multiple inheritance is not supported for Class::Array!)";
+		        # I do accept mult. inh. now
+		        croak __PACKAGE__.": Error: class $class is set up as Class::Array type class, but has an empty \@ISA";
 		}
 	} # else something is strange, isn't it? ##
 }	
@@ -223,10 +225,12 @@ warn "flag_inherit=$flag_inherit, calling_class=$calling_class, class=$class" if
 		$hashref= $incomplete_hashref ? $incomplete_hashref : {};
 		my $superclass= do {
 			my $isaref= *{"${class}::ISA"}{ARRAY};
-			if ($isaref and @$isaref == 1) {
+			if ($isaref and @$isaref >= 1) {
 				$isaref->[0]
 			} else {
-				croak __PACKAGE__.": Error: class $class doesn't have a valid \@ISA (multiple inheritance is not supported for Class::Array!)";
+				#croak __PACKAGE__.": Error: class $class doesn't have a valid \@ISA (multiple inheritance is not supported for Class::Array!)";
+			  # I do accept mult. inh. now
+			  croak __PACKAGE__.": Error: class $class is set up as Class::Array type class, but has an empty \@ISA";
 			}
 		};
 		if (defined ${"${superclass}::_CLASS_ARRAY_COUNTER"}) {
@@ -661,6 +665,12 @@ reason not to use multiple inheritance with arrays is that  users can't both
 inherit from hash and array based classes, so any class aiming to be
 compatible to other classes to allow multiple inheritance  should use the
 standard hash based approach.
+
+Note that you can still force multiple inheritance by loading further
+subclasses yourself ('use Classname ()' or 'require Classname') and
+push()ing the additional classnames onto @ISA.
+(But for Class::Array, subclasses of such a class will look as they
+would only inherit from the one class that Class::Array has been told of.)
 
 =head1 NOTE
 

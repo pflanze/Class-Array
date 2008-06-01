@@ -6,7 +6,7 @@ package Class::Array::Exception;
 # (christian jaeger, cesar keller, philipp suter, peter rohner)
 # Published under the terms of the GNU General Public License
 #
-# $Id: Exception.pm,v 1.11 2002/09/13 07:44:41 chris Exp $
+# $Id: Exception.pm,v 1.12 2002/11/12 10:42:45 chris Exp $
 
 =head1 NAME
 
@@ -435,7 +435,9 @@ sub stacktrace {
 	if ($stacktrace_output and $self->[ExceptionStacktrace]) {
 		"\tStacktrace:\n"
 		.join("", map { 
-				"\t$_->[0] line $_->[1] called $_->[2]\n"
+				#"\t$_->[0] line $_->[1] called $_->[2]\n"
+                                "\t$$_[2]\n". 
+                                "\t\tat $$_[0] line $$_[1]\n" 
 			} $self->stacktrace_loa)
 	} else {
 		""
