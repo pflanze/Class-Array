@@ -1,5 +1,11 @@
 Revision history for Perl extension Class::Array.
 
+0.06b1
+	- added make_sthreader method to Class::Array::WithDBI
+
+pre7
+pre6
+
 0.05pre5  
 	- ucfirstletter / lcfirstletter instead of ucfirst / lcfirst
 	- ç unfinished dump routine which should pretty-dump obj.

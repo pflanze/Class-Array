@@ -67,6 +67,11 @@ You could call $obj->method_name multiple times before re-executing
 the statement handle if the result
 set contains multiple rows (but usually that won't make sense).
 
+=item make_sthreader( $statementhandle [, values_to_return ])
+
+Functional: returns the code ref doing the exact same as the above;
+unlike create_sthreader, it does not save it into the caller package.
+
 =back
 
 =head1 NOTES
@@ -91,16 +96,17 @@ require Class::Array;
 use strict;
 no strict 'refs';
 
-sub create_sthreader {
+sub make_sthreader {
     my $class=shift;
-    croak "Class method create_sthreader called on a reference" if ref $class;
-    my $methodname=shift or croak "Missing methodname argument for create_set_from_sth";
+    #my $opt_assign_to=shift; # a glob or scalar ref, where the 2nd stage closure is assigned to.  ##ah, untercheiden nötig?!  ah bessere idee, viel besser:
+    my $assign_2ndstage=shift; # must be 1ary procedure, gets new closure, must store it.
+    my $methodname=shift; # only informational
     my $sth=shift; ref $sth or croak "Missing dbi statement handle object as 2nd parameter";
     # the remaining arguments is a list with values to return instead of putting into the object
     my @returnvalues=@_;
     my %returnvalues= map {$_=>undef} @returnvalues;
-    
-    *{"${class}::$methodname"}= sub {
+
+    sub {
         my $self=shift;
         my $class= ref($self) or croak("$methodname: Object method called without object");
         my $fields= $sth->{NAME} or Carp::croak("could not get NAME hash from statement handle - did you execute it? Stopped");
@@ -188,14 +194,26 @@ sub create_sthreader {
         }';
         #warn "Generated the following code for '${class}::$methodname': $code\n";
         #undef *{"${class}::$methodname"};
-        delete ${"${class}::"}{$methodname};
-        $code= *{"${class}::$methodname"} = eval $code;
+	my $coderef= eval $code;
         die "Error while generating second stage code for '${class}::$methodname': $@" if $@;
-        &$code($self);
+	$assign_2ndstage->($coderef);
+        &$coderef($self);
     };
 }
 
-
-
+sub create_sthreader {
+    my $class=shift;
+    croak "Class method create_sthreader called on a reference" if ref $class;
+    my $methodname=shift or croak "Missing methodname argument for create_set_from_sth";
+    *{"${class}::$methodname"}=
+      $class->make_sthreader
+	(sub {
+	     my ($secondstagecoderef)=@_;
+	     delete $ {"${class}::"}{$methodname};
+	     *{ "${class}::$methodname" } = $secondstagecoderef;
+	 },
+	 $methodname,
+	 @_);
+}
 
 1;
