@@ -2,7 +2,6 @@
 
 use strict;
 
-
 #use lib '/home/chris/Projekt/CVS_2ndcheckouts/';
 use lib ".";
 
@@ -12,7 +11,8 @@ try {
 	print "Hallo Welt\n";
 	open IN, "ASDVASFDVAF" or throw My::IOException '<title>Blabla</title><body>Hehehe das geht nicht</body>';
 	try {
-		print <IN> or die;
+		print <IN> || die "XX";
+		print "Hallo\n";
 	}
 	finally {
 		close IN;

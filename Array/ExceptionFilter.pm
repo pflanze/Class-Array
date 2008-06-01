@@ -3,7 +3,7 @@ package Class::Array::ExceptionFilter;
 # copyright 2002 by christian jaeger , pflanze@gmx.ch
 # published under the same terms as perl
 #
-# $Id: ExceptionFilter.pm,v 1.3 2002/04/02 03:09:45 chris Exp $
+# $Id: ExceptionFilter.pm,v 1.4 2002/04/03 04:51:47 chris Exp $
 
 =head1 NAME
 
@@ -23,9 +23,10 @@ memory leaks.
 Currently it's not fully backwards compatible to Error.pm, though I guess
 it's mainly only missing some rewritten base class to be so.
 
-ExceptionFilter sets up a check for all classes used in catch phrases,
-so you will get a warning if a listed class is not loaded or does not
-provide a 'rethrow' method. This is to prevent errors at compile time.
+ExceptionFilter sets up a check for all classes used in catch phrases
+(and also those used for throw and rethrow, see below),
+so you will get a compile time warning if warnings are on and a listed class 
+is not loaded or does not provide 'throw' and 'rethrow' methods. 
 
 =head1 SYNTAX
 
@@ -69,9 +70,10 @@ during the finally block, the previously uncatched error/exception is lost.
 
 =back
 
-Note that the "throw" and "rethrow" (and other) keywords are really methods in
-the class you call them on, so they are not part of the syntax
-introduced by ExceptionFilter.
+Note that "throw" and "rethrow" are really methods in the class you call them on, 
+but if you use them in indirect object syntax ('throw My::Namespace ()' as opposed
+to 'My::Namespace->throw()') ExceptionFilter does check their namespace argument
+at compile time, too.
 
 Note that ExceptionFilter will filter your source code each time it is use'd
 (from the point of the use statement until a 'no Class::Array::ExceptionFilter;' or
@@ -375,6 +377,10 @@ sub transform { # pass in *references* for string and line
 				print "-- no real try (is only a marker or something) (line $line) --\n" if DEBUG>=2;
 			}
 
+		} elsif (/\G(?:re)?throw\b(\s*)([\w:]+)/sgoc) {
+			$copy=$1; $line+= $copy=~ tr/\n/\n/;
+			push @$checknamespaces, [$line, $2];
+			
 		} else {
 			print "Beginning of statement with unknown construct\n" if DEBUG>=2;
 		}
@@ -420,20 +426,23 @@ FILTER_ONLY
 ;
 
 sub checknamespaces {
+	return unless $^W;
 	my ($package,$filename)= caller;
 	no strict 'refs';
 	while (my $r= shift @{"${package}::__ExceptionFilterCHECK"}) { # should only be 1
 		for (@$r) {
 			my ($line,$ns)= @$_;
 			if (%{"${ns}::"}) {
-				if ($ns->can('rethrow')) {# would be nice to trap the warning "Can't locate package sss for @Ahd::ISA at ..."
-					print "'$ns' exists and is ok\n" if DEBUG>=2;
+				if ($ns->can('throw')) {# would be nice to trap the warning "Can't locate package sss for @Ahd::ISA at ..."
+					if ($ns->can('rethrow')) {
+						print "'$ns' exists and is ok\n" if DEBUG>=2;
+					} else {
+						warn __PACKAGE__." warning: package '$ns' is loaded, but misses a rethrow method at $filename line $line\n";
+					}
 				} else {
-					print "'$ns' exists, but is missing rethrow method\n" if DEBUG>=2;
-					warn __PACKAGE__." warning: package '$ns' is loaded, but misses a rethrow method at $filename line $line\n";
+					warn __PACKAGE__." warning: package '$ns' is loaded, but misses a throw method at $filename line $line\n";
 				}
 			} else {
-				print "'$ns' not loaded\n" if DEBUG>=2;
 				warn __PACKAGE__." warning: package '$ns' does not exist (not loaded?) at $filename line $line\n";
 			}
 		}
