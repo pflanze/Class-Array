@@ -6,7 +6,7 @@ package Class::Array::XMLException;
 # (christian jaeger, cesar keller, philipp suter, peter rohner)
 # Published under the terms of the GNU General Public License
 #
-# $Id: XMLException.pm,v 1.2 2002/04/27 19:03:41 chris Exp $
+# $Id: XMLException.pm,v 1.3 2002/09/01 01:50:08 chris Exp $
 
 =head1 NAME
 
@@ -47,10 +47,25 @@ my %escapes = (
         '"' => '&quot;',
         );
 
-sub xml_escape {
-    my $text = shift;
-    $text =~ s/([<>'&"])/$escapes{$1}/egsx;
-    return $text;
+sub xml_escape { # for tag contents, leave " and ' as is since that's more 
+                # comfortable to work with manually
+    if (defined wantarray) {
+        my $text = shift;
+        $text =~ s/([<>&])/$escapes{$1}/egsx;
+        return $text;
+    } else {
+        for (@_) { $_ =~ s/([<>&])/$escapes{$1}/egsx }
+    }
+}
+
+sub xml_escape_attribute { # also escape " and ' (I'm not sure if ' needs escaping though)
+    if (defined wantarray) {
+        my $text = shift;
+        $text =~ s/([<>&"'])/$escapes{$1}/egsx;
+        return $text;
+    } else {
+        for (@_) { $_ =~ s/([<>&"'])/$escapes{$1}/egsx }
+    }
 }
 
 sub as_errorxml {

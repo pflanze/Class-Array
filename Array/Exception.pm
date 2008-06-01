@@ -6,7 +6,7 @@ package Class::Array::Exception;
 # (christian jaeger, cesar keller, philipp suter, peter rohner)
 # Published under the terms of the GNU General Public License
 #
-# $Id: Exception.pm,v 1.10 2002/05/17 12:06:52 chris Exp $
+# $Id: Exception.pm,v 1.11 2002/09/13 07:44:41 chris Exp $
 
 =head1 NAME
 
@@ -166,9 +166,13 @@ allow you to examine the arguments in detail.)
 
 =item throw_existing ([ caller_i ])
 
-These do the same (I didn't find a really good name for them yet,
-I would like to just use 'throw' for that purpose but that's already
-used for compatibility (see above)), namely throw an existing exception object
+These two do the same (I didn't find a really good name for them,
+I would have liked to just use 'throw' for that purpose but that's already
+used for compatibility (see above)), though C<throw_existing> is 
+slightly deprecated since C<ethrow> is shorter and it's better only to use
+one method. Think "economical throw" if you want.
+
+They throw an existing exception object
 that has been created by 'new'. 
 They record the package/file/line where they are called from,
 erase the ExceptionRethrown field and then call die.
@@ -210,6 +214,15 @@ stacktrace settings).
 Used by the 'stacktrace' method.
 
 =back
+
+=head1 BUGS
+
+Maybe throw() should always use new() internally, so you only have to override
+new and not also throw in subclasses if you want to use more than 2 arguments.
+But then the caller_i argument handling would get in the way.
+
+Maybe the caller_i mechanism should be replaced by something better (class 
+name to start backtracing?, or?).
 
 =head1 SEE ALSO
 
