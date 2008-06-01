@@ -1,0 +1,77 @@
+--- lib/Filter/Simple.pm_orig	Tue Apr  2 02:57:16 2002
++++ lib/Filter/Simple.pm	Tue Apr  2 04:59:23 2002
+@@ -4,7 +4,7 @@
+ 
+ use vars qw{ $VERSION @EXPORT };
+ 
+-$VERSION = '0.77';
++$VERSION = '0.77.hackedbycj';
+ 
+ use Filter::Util::Call;
+ use Carp;
+@@ -53,6 +53,8 @@
+ 	string     => [ $ws,  $pod_or_DATA, $id, $exql                   ],
+ 	code       => [ $ws, { DONT_MATCH => $pod_or_DATA },
+ 			$id, { DONT_MATCH => \&extract_quotelike }       ],
++        codecj     => [ $ws, { DONT_MATCH => $pod_or_DATA },
++                        $id, { DONT_MATCH => \&extract_quotelike }       ],
+ 	executable => [ $ws, { DONT_MATCH => $pod_or_DATA }              ],
+ 	all	   => [            { MATCH      => qr/(?s:.*)/         } ],
+ );
+@@ -94,6 +96,14 @@
+ 			  },
+ );
+ 
++# Hacked by pflanze@gmx.ch on Sun, 31 Mar 2002 17:58:27 +0200:
++# added codecj handler which:
++# Changed marker format from $;ZZZZ$; to $;ZZZZNN$;, where
++# ZZZZ= counter,
++# NN= number of newlines in the replaced part
++# (maybe at some time it would also be a good idea to include a
++# T= type of replacement (pod, string, regex, ...))
++# codecj also tries to correctly strip #comment\n parts => this is really Text::Balanced's fault
+ 
+ sub gen_std_filter_for {
+ 	my ($type, $transform) = @_;
+@@ -114,6 +124,41 @@
+ 		        $transform->(@_);
+ 			s/$extractor/${$pieces[unpack('N',$1)]}/g;
+ 		     }
++                     elsif ($type eq 'codecj') {
++                        my $count = 0;
++						local $placeholder = qr/\Q$;\E(?:\C{4}\C{2})\Q$;\E/;
++                        my $extractor = qr/\Q$;\E(\C{4})\C{2}\Q$;\E/;
++                        $_ = join "",
++                                  map { ref $_ ? $;.pack('N',$count++)."".pack('n',$$_=~ tr/\n/\n/).$; : $_ }
++                                      @pieces;
++						# strip comments; if marker contained within comment, replace that one back before stripping.
++						# (= hacky way to introduce comment state besides string state)
++						# Well SHIT of course it doesn't really help. since if a string goes on too long, 
++						# Text::Balanced will miss the real, non-commented, strings further on.
++						# So this here is mere cosmetics
++                        @pieces = grep { ref $_ } @pieces;
++						pos($_)=0;
++						my ($begin,$end);
++						while (/\#.*?(?:$extractor|\n)/sgoc) {
++							$begin= $-[0]; # requires perl 5.6?
++							if (defined $1) { 
++								# replace with original
++								my $i= unpack('N',$1);
++								#warn "i=$i, piece='${$pieces[$i]}'";
++								substr($_, pos($_)-8,8, ${$pieces[$i]});
++								undef $pieces[$i]; # we can't splice it out because it would change the numbering
++								# restart search
++								pos($_)= $begin;
++							} else {
++								# strip it
++								$end= pos($_);
++								substr($_,$begin, $end-1-$begin, "");
++								pos($_)= $begin+1;
++							}
++						}
++                        $transform->(@_);
++                        s/$extractor/${$pieces[unpack('N',$1)]}/g;
++                     }
+ 		     else {
+ 		        my $selector = $selector_for{$type}->($transform);
+ 		        $_ = join "", map $selector->(@_), @pieces;

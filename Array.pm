@@ -9,7 +9,7 @@ package Class::Array;
 # $Id: Array.pm,v 1.17 2002/03/11 23:29:56 chris Exp $
 
 
-$VERSION = '0.04pre5';
+$VERSION = '0.04pre6';
 
 use strict;
 use Carp;
@@ -723,3 +723,29 @@ Oky, nun geflickt.
 --
 Neu: zusammen mit dem alias_fields erledigen. Gleich in das hash stecken.
 Oder eben doch separat, dann aber gleiches Prinzip.
+
+----
+Thu, 28 Mar 2002 01:03:26 +0100
+
+Bug von cesar gemeldet:
+ Person
+ Author
+ Who
+use Who -namehash A
+use Author -namehash B
+	sei korrekt, aber
+use Author -namehash B
+use Who -namehash A
+	sei falsch, in A sei dann NUR das von Who.
+
+Hmmmm, wieso dies    $superclass->class_array_namehash   auf Zeile 215? Buggybuggybuggybuggybuggy
+Soll ich erst Glacé essen gehen oder zuersst das hier fertig machen?
+Philipp hat wieder eine lange wartephase.
+Und Nadia schreibt mir nicht zurück und fw auch nicht.
+
+Hmmm wie funktionniert das mit dam incomplete_hashref ??
+Das ist so dass von oben kommend schon gefüllt?, und dann untenzeugrein?   Oder umgekehrt?
+umgekehrt: leer. rauf. rauf. rauf. füllen. zurück. weiterfüllen. zurück. weiterfüllen.
+Aber heee scheissbuggyfalsch, ich mach ja gar keine Kopie?? für das caching?
+
+Also das mit dem incomplete kann ich ja vergessen. Muss super holen. ......

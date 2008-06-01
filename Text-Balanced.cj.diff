@@ -1,0 +1,28 @@
+--- lib/Text/Balanced.pm_orig	Sun Nov 18 12:49:51 2001
++++ lib/Text/Balanced.pm	Tue Apr  2 02:45:42 2002
+@@ -10,7 +10,7 @@
+ use SelfLoader;
+ use vars qw { $VERSION @ISA %EXPORT_TAGS };
+ 
+-$VERSION = '1.89';
++$VERSION = '1.89.hackedbycj';
+ @ISA		= qw ( Exporter );
+ 		     
+ %EXPORT_TAGS	= ( ALL => [ qw(
+@@ -67,7 +67,15 @@
+ 			push @res, substr($$textref,$from,$len);
+ 		}
+ 		if ($extralen) {	# CORRECT FILLET
+-			my $extra = substr($res[0], $extrapos-$startlen, $extralen, "\n");
++			##cj hack: just catch the error
++			my $extra;
++			eval {
++				$extra = substr($res[0], $extrapos-$startlen, $extralen, "\n");
++			};
++			if ($@) {
++				warn "WARNING: ignoring error (with reason unknown by cj), returning";
++				return @res; ##? should we still do at least the pos stuff?
++			}
+ 			$res[1] = "$extra$res[1]";
+ 			eval { substr($$textref,$remainderpos,0) = $extra;
+ 			       substr($$textref,$extrapos,$extralen,"\n")} ;

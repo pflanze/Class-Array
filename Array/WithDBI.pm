@@ -27,7 +27,7 @@ no strict 'refs';
 
 sub create_sthreader {
 	my $class=shift;
-	croak "Class method create_sthreader called with a reference" if ref $class;
+	croak "Class method create_sthreader called on a reference" if ref $class;
 	my $methodname=shift or croak "Missing methodname argument for create_set_from_sth";
 	my $sth=shift; ref $sth or croak "Missing dbi statement handle object as 2nd parameter";
 	# the remaining arguments is a list with values to return instead of putting into the object

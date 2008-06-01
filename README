@@ -1,3 +1,5 @@
-This is only a quickly packaged package. What's missing: t/ dir (tests), MANIFEST(?),..
+Make perl5 better for object oriented programming
 
-Please read the documentation in Array.pm :-)
+Fast objects with access rules and typo protection.
+
+Fast exception handling in real try/catch/finally manner.
