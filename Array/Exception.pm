@@ -6,7 +6,7 @@ package Class::Array::Exception;
 # (christian jaeger, cesar keller, philipp suter, peter rohner)
 # Published under the terms of the GNU General Public License
 #
-# $Id: Exception.pm,v 1.3 2002/04/02 14:28:02 chris Exp $
+# $Id: Exception.pm,v 1.4 2002/04/07 17:46:54 chris Exp $
 
 =head1 NAME
 
@@ -68,12 +68,20 @@ or number context and get a nice error summary or the ExceptionValue.
 
 =over 4
 
-=item new( text, value )
+=item new( text, value [, caller_i ] )
 
-=item throw( text, value )
+=item throw( text, value [, caller_i ]  )
 
-These are the same except that throw actually calls die and also
-sets the ExceptionPackage,ExceptionFile and ExceptionLine fields.
+These are the same except that throw actually calls die, and
+that throw always records the package/file/line where it is called from
+whereas new only does this if caller_i is defined. caller_i defines 
+which caller (how many levels up the call stack) should be recorded.
+
+NOTE: you can use throw as an object method as well, it then behaves
+identical to rethrow. (I find it better to explicitely use "rethrow" 
+for this purpose though, since it expresses better what it does.
+'throw' is only a hybrid class/object method since
+Error.pm uses 'throw' to rethrow an exception (as does C++).)
 
 =back
 
@@ -81,15 +89,29 @@ sets the ExceptionPackage,ExceptionFile and ExceptionLine fields.
 
 =over 4
 
+=item ethrow ([ caller_i ])
+
+=item throwe ([ caller_i ])
+
+These do the same (I didn't find a really good name for them yet,
+I would like to just use 'throw' for that purpose but that's already
+used for compatibility (see above)), namely throw an existing exception object
+that has been created by 'new'. 
+They record the package/file/line where they are called from,
+erase the ExceptionRethrown field and then call die.
+This makes it possible to reuse exception objects.
+For caller_i see 'new'/'throw'.
+
 =item rethrow
 
 Records package, file and line where rethrow is called from
-into ExceptionRethrown and calls die again. 
+into ExceptionRethrown and then calls die. 
 
 NOTE: this method is currently used by Class::Array::ExceptionFilter;
-maybe I should instead just use 'throw' as an object method as well
+maybe I should instead just use 'throw' 
 to make it easier to use Class::Array::ExceptionFilter with
 Error::Simple (as Error.pm replacement).
+I've already made 'throw' a hybrid class/object method for this reason.
 
 =back
 
@@ -148,11 +170,48 @@ sub new {
 
 sub throw {
 	my $class=shift;
-	my ($text,$value,$caller_i)=@_;
-	#my $self= $class->SUPER::new;
-	my $self = bless [], $class;
-	@$self[ExceptionText,ExceptionValue]= ($text,$value);
-	@$self[ExceptionPackage,ExceptionFile,ExceptionLine]= caller($caller_i||0); ## is this a costly operation?
+	if (ref $class) {
+		#if ($self->[ExceptionRethrown]) {
+			if (defined $class->[ExceptionPackage]) {
+				# rethrow
+				push @{$class->[ExceptionRethrown]}, [ caller ];
+				die $class
+			} else {
+				my ($p,$f,$l)=caller;
+				die "'throw' of a pristine exception object not allowed, use ethrow instead at $f line $l\n";
+			}
+		#} else {
+		#	# throw the existing but never thrown exception object
+		#	...see below
+		#	$class->[ExceptionRethrown]=[];
+		#	die $class
+		#}
+		#  We *could* do all this, to make it possible to 'throw' a 'new'ly created
+		#  exception object so it is distinct from being rethrown, but I doubt this
+		#  makes much sense, I think it's better to always use ethrow for that purpose.
+	} else {
+		# create new object
+		my ($text,$value,$caller_i)=@_;
+		#my $self= $class->SUPER::new;
+		my $self = bless [], $class;
+		@$self[ExceptionText,ExceptionValue]= ($text,$value);
+		@$self[ExceptionPackage,ExceptionFile,ExceptionLine]= caller($caller_i||0); ## is this a costly operation?
+		# do this   $self->[ExceptionRethrown]=[];  and then check above so throw $@ can decide if it's the first throw or not?
+		die $self
+	}
+}
+
+sub throwe { # throw existing  (erase rethrow data before doing so)
+	my $self=shift;
+	undef $self->[ExceptionRethrown];# or $self->[ExceptionRethrown]=[];
+	@$self[ExceptionPackage,ExceptionFile,ExceptionLine]= caller(@_);
+	die $self
+}
+
+sub ethrow { # same as throwe
+	my $self=shift;
+	undef $self->[ExceptionRethrown];# or $self->[ExceptionRethrown]=[];
+	@$self[ExceptionPackage,ExceptionFile,ExceptionLine]= caller(@_);
 	die $self
 }
 
