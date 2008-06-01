@@ -1,5 +1,28 @@
 Revision history for Perl extension Class::Array.
 
+
+0.05pre4  Mon,  1 Nov 2004 21:34:02 +0100
+	- introduced class_array_conformize conformize-fieldname
+	  functionality: now you can define fields all-lowercase if
+	  you want and it'll ucfirst them for you.
+
+
+0.05pre3  Sun, 31 Oct 2004 13:22:22 +0100
+	- added -publica field type, and createaccessors function
+	- added end function/method ('end Class::Array'),
+	  which is itself calling stuff like createaccessors
+	- now when subclasses define a field that already has been
+	  defined by a parent class as a public/publica/protected
+	  field, it is just shadowed (doesn't conflict anymore).
+	  Even for exports (public fields) the new field shadows the old.
+	  publica fields only shadow public fields inside subclasses,
+	  not for exports, where still only public fields play a role.
+	  (publica fields though are, as is usual for methods of course,
+	  shadowing as usual, but well, they are not overshadowed themselves
+	  by public fields since the latter do not create accessors! heh.)
+	  (it's like public and publica are two separate 'namespaces')(right?)
+
+
 (Thu, 11 Apr 2002 09:40:55 +0200
 Starting from 0.04pre12, the ExceptionFilter.pm has been 
 changed to Error::Filter.pm)

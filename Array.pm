@@ -9,24 +9,24 @@ package Class::Array;
 # $Id: Array.pm,v 1.26 2003/04/11 16:49:12 chris Exp $
 
 
-$VERSION = '0.05pre2';
+$VERSION = '0.05pre4';
 
 use strict;
 use Carp;
 
 #use constant DEBUG=>0;
-sub DEBUG () {$ENV{CLASS_ARRAY_DEBUG}||0};
+BEGIN { eval 'sub DEBUG () {'.((!!$ENV{CLASS_ARRAY_DEBUG})||0).'}'; die if $@;}
 $|=1 if DEBUG;
 
 #use enum qw(PUBLIC PROTECTED PRIVATE);
 sub PUBLIC () {0}; sub PROTECTED () {1}; sub PRIVATE () {2}; # enum is not in the base perl 5.005 dist
-
+sub PUBLICA () {3}; # (new 04/10/31) public only via accessors, not via field constant export.
 
 sub import {
     my $class=shift;
     my $calling_class;
     # sort out arguments:
-    my (@normal_import, @only_fields, @newpublicfields, @newprotectedfields, @newprivatefields);
+    my (@normal_import, @only_fields, @newpublicfields, @newpublicafields, @newprotectedfields, @newprivatefields);
     my $publicity= PROTECTED; # default behaviour!
     my $namehash;
     my ($flag_fields, $flag_extend, $flag_onlyfields, $flag_base, $flag_nowarn, $flag_namehash,
@@ -55,6 +55,12 @@ sub import {
                 $publicity=PUBLIC;
             } else {
                 croak __PACKAGE__.": missing -extend or -fields option before -public";
+            }
+        } elsif ($_ eq '-publica' or $_ eq '-pub') {
+            if ($flag_extend || $flag_fields) {
+                $publicity=PUBLICA;
+            } else {
+                croak __PACKAGE__.": missing -extend or -fields option before -publica";
             }
         } elsif ($_ eq '-shared'|| $_ eq '-protected') {
             if ($flag_extend || $flag_fields) {
@@ -88,11 +94,13 @@ sub import {
         } else {
             if ($flag_fields || $flag_extend) {
                 if ($publicity == PUBLIC) {
-                    push @newpublicfields,$_;
+                    push @newpublicfields,$class->class_array_conformize($_);
+		} elsif ($publicity == PUBLICA) {
+                    push @newpublicafields,$class->class_array_conformize($_);
                 } elsif ($publicity == PROTECTED) {
-                    push @newprotectedfields,$_;
+                    push @newprotectedfields,$class->class_array_conformize($_);
                 } else {
-                    push @newprivatefields,$_;
+                    push @newprivatefields,$class->class_array_conformize($_);
                 }
             } elsif ($flag_onlyfields) {
                 push @only_fields, $_;
@@ -123,14 +131,20 @@ sub import {
         croak __PACKAGE__.": you can't give both -fields and -onlyfields options";
     } elsif ($flag_fields) {  # set up $calling_class as base class
         my $counter=0; ##PS. könnte bei 1 anfangen und ins arrayelement 0 was anderes stopfen...
-        create_fields_and_bless_class ($calling_class, $counter, \@newpublicfields, \@newprotectedfields, \@newprivatefields, $class);
+        create_fields_and_bless_class ($calling_class,
+				       $counter,
+				       \@newpublicfields,
+				       \@newpublicafields,
+				       \@newprotectedfields,
+				       \@newprivatefields,
+				       $class);
         if ($namehash) {
             $calling_class->class_array_namehash($namehash,1,$calling_class,1);
         }
 
     } elsif ($flag_extend) {  # Inherit a class
         no strict 'refs';
-        my $counter= ${"${class}::_CLASS_ARRAY_COUNTER"};
+        my $counter= $ {"${class}::_CLASS_ARRAY_COUNTER"};
         unless (defined $counter) {
             if ($class eq __PACKAGE__) {
                 croak __PACKAGE__.": please use the '-fields' argument instead of '-extend' for deriving from the Class::Array base class";
@@ -140,11 +154,22 @@ sub import {
             }
         }
         warn "    going to call create_fields_and_bless_class for extension, calling_class=$calling_class, counter=$counter, class=$class" if DEBUG;
-        create_fields_and_bless_class ($calling_class, $counter, \@newpublicfields, \@newprotectedfields, \@newprivatefields, $class);
+	create_fields_and_bless_class ($calling_class,
+				       $counter,
+				       \@newpublicfields,
+				       \@newpublicafields,
+				       \@newprotectedfields,
+				       \@newprivatefields,
+				       $class);
         if (#  $class ne __PACKAGE__) {
-	    defined ${"${class}::_CLASS_ARRAY_SUPERCLASS"}) {
-            alias_fields ($class, $calling_class, $flag_onlyfields ? { map { $_=> 1 } @only_fields } : undef,
-			  $flag_nowarn, !$flag_fields);
+	    defined $ {"${class}::_CLASS_ARRAY_SUPERCLASS"}) {
+	    alias_fields ($class,
+			  $calling_class,
+			  $flag_onlyfields ? { map { $_=> 1 } @only_fields } : undef,
+			  $flag_nowarn,
+			  !$flag_fields,
+			  {map { $_=>1 } @newpublicfields,@newpublicafields,@newprivatefields },
+			 );
         }
         if ($namehash) {
             $calling_class->class_array_namehash($namehash,1,$calling_class,1);
@@ -167,31 +192,48 @@ sub import {
 
 
 sub alias_fields {
-    my ($class, $calling_class, $only_fields, $flag_nowarn, $flag_inherit) =@_;
+    my ($class,
+	$calling_class,
+	$only_fields,
+	$flag_nowarn,
+	$flag_inherit,
+	$ignore_fields, # optional; the opposite of only_fields, 'usually' contains those fields that have been newly created  or already aliased.
+       ) =@_;
+    $ignore_fields||={};
     no strict 'refs';
     if (defined *{"${class}::_CLASS_ARRAY_PUBLIC_FIELDS"}{ARRAY}) {
-        for (@{"${class}::_CLASS_ARRAY_PUBLIC_FIELDS"}, ($flag_inherit ? @{"${class}::_CLASS_ARRAY_PROTECTED_FIELDS"}: ()) ) { 
+        for (@{"${class}::_CLASS_ARRAY_PUBLIC_FIELDS"},
+	     ($flag_inherit ?
+	      (@{"${class}::_CLASS_ARRAY_PROTECTED_FIELDS"},@{"${class}::_CLASS_ARRAY_PUBLICA_FIELDS"})
+	      : ())
+	    ) {
             if (!$only_fields or $only_fields->{$_}) {
-                if (defined *{"${calling_class}::$_"}{CODE}) {
-                    if (*{"${calling_class}::$_"}{CODE} == *{"${class}::$_"}{CODE}) {
-                        warn "${calling_class}::$_ exists already but is the same as ${class}::$_" if DEBUG;
-                    } else {
-                        carp __PACKAGE__.": conflicting name `$_': ignoring and also removing existing entry (all of \*$_ !)" unless $flag_nowarn;
-                        #delete *{"${calling_class}::$_"}{CODE}; ## geht nicht, muss undef?:
-                        #undef *{"${calling_class}::$_"}{CODE}; ## geht auch nicht, Can't modify glob elem in undef operator
-                        #*{"${calling_class}::$_"}= undef; ## ist doch wüst weil es auch alle andern löscht.
-                        #*{"${calling_class}::$_"}= *Class::Array::nonexistant{CODE}; ist genaudasselbe.
-                        #*{"${calling_class}::$_"}= sub { print "SCheisse\n" };  #"
-                        delete ${"${calling_class}::"}{$_}; #"  OK! Works, but deletes all glob fields, not only CODE. Does anybody know how to do this correctly? In Perl?, in a C extension?
-                    }
-                } else {
-                    *{"${calling_class}::$_"}= *{"${class}::$_"}{CODE};
-                }
+		if ($ignore_fields->{$_}) {
+		    warn "alias_fields: ignoring field '$_' in class '$class'" if DEBUG;
+		} else {
+		    if (defined *{"${calling_class}::$_"}{CODE}) {
+			if (*{"${calling_class}::$_"}{CODE} == *{"${class}::$_"}{CODE}) {
+			    warn "${calling_class}::$_ exists already but is the same as ${class}::$_" if DEBUG;
+			    $ignore_fields->{$_}=1;
+			} else {
+			    carp __PACKAGE__.": conflicting name `$_': ignoring and also removing existing entry (all of \*$_ !)" unless $flag_nowarn;
+			    #delete *{"${calling_class}::$_"}{CODE}; ## geht nicht, muss undef?:
+			    #undef *{"${calling_class}::$_"}{CODE}; ## geht auch nicht, Can't modify glob elem in undef operator
+			    #*{"${calling_class}::$_"}= undef; ## ist doch wüst weil es auch alle andern löscht.
+			    #*{"${calling_class}::$_"}= *Class::Array::nonexistant{CODE}; ist genaudasselbe.
+			    #*{"${calling_class}::$_"}= sub { print "SCheisse\n" };  #"
+			    delete $ {"${calling_class}::"}{$_}; #"  OK! Works, but deletes all glob fields, not only CODE. Does anybody know how to do this correctly? In Perl?, in a C extension?
+			}
+		    } else {
+			*{"${calling_class}::$_"}= *{"${class}::$_"}{CODE};
+			$ignore_fields->{$_}=1;
+		    }
+		}
             }
         }
-    my $superclass= ${"${class}::_CLASS_ARRAY_SUPERCLASS"};
-    warn  "! ${class}::_CLASS_ARRAY_SUPERCLASS =$superclass\n" if DEBUG;
-
+	my $superclass= $ {"${class}::_CLASS_ARRAY_SUPERCLASS"};
+	warn  "! ${class}::_CLASS_ARRAY_SUPERCLASS =$superclass\n" if DEBUG;
+	
         unless ( $superclass ) {
 	    my $isaref= *{"${class}::ISA"}{ARRAY};
 	    #print STDERR "! ${class}::ISA = ".(join ",",@$isaref )."\n";
@@ -204,7 +246,7 @@ sub alias_fields {
 	    return;
 	};
 
-        alias_fields ( $superclass, $calling_class, $only_fields, $flag_nowarn, $flag_inherit);
+        alias_fields ( $superclass, $calling_class, $only_fields, $flag_nowarn, $flag_inherit, $ignore_fields);
     } # else something is strange, isn't it? ##
 }
 
@@ -234,67 +276,59 @@ sub class_array_namehash_allprotected { # get all protected field definitions in
     return $hashref
 }
 
-sub class_array_namehash { ##replaces create_name_lookup_hash   # ps. doch eher $class->Class::Array::namehash nennen?
-# Aufruf a) von neuem class, um eigene UND obenstehende reinzukriegen.  b) von outer, um nur public von der class zu kriegen.
-# Maybe we should also take optional $hashname and $cachehash arguments and put the hash HERE into the CLASS_ARRAY_NAMEHASH var and do aliases
+sub class_array_namehash {
     my $class=shift;
-    my ($hashname, $flag_inherit, $calling_class, $flag_cachehash, $incomplete_hashref) =@_; # flag_inherit sagt quasi "ich bin n member und will die protected von oberhalb und meine eigenen protected + private sehen."
+    my ($hashname, $flag_inherit, $calling_class, $flag_cachehash, $incomplete_hashref) =@_;
     $calling_class= caller unless defined $calling_class;
-#    $flag_inherit= $calling_class->isa($class) unless defined $flag_inherit; ##korrekt?
-#warn "-d1-class_array_namehash: hashhame=$hashname, flag_inherit=$flag_inherit, calling_class=$calling_class, class=$class,flag_cachehash=$flag_cachehash\n" if DEBUG;
     $flag_inherit= ( $calling_class->isa($class) || $class->isa($calling_class) )
-      unless defined $flag_inherit; ##korrekt?
-warn "-d1-class_array_namehash: hashhame=$hashname, flag_inherit=$flag_inherit, calling_class=$calling_class, class=$class,flag_cachehash=$flag_cachehash\n" if DEBUG;
+      unless defined $flag_inherit;
     no strict 'refs';
     my $hashref;
-    # check if not already cached:
-    if ($hashref= do {
-        if ($flag_inherit) {
-            *{"${calling_class}::CLASS_ARRAY_NAMEHASH"}{HASH}
-        } else {
-            *{"${class}::_CLASS_ARRAY_NAMEHASHFOREXTERNALUSE"}{HASH}
-        }
-    }) {
-        # already done
-        warn "Using cached namehash for '$class'" if DEBUG;
+    if ($hashref=
+	$flag_inherit ?
+	*{"${calling_class}::CLASS_ARRAY_NAMEHASH"}{HASH}
+        :
+	*{"${class}::_CLASS_ARRAY_NAMEHASHFOREXTERNALUSE"}{HASH}
+       ) {
+        warn "using cached namehash for '$class'" if DEBUG;
     } else {
-        # need to create it
-        $hashref= $incomplete_hashref ? $incomplete_hashref : {};
-        my $superclass= ${"${class}::_CLASS_ARRAY_SUPERCLASS"};
-#        warn "d1-class_array_namehash: build hashref with superclass=$superclass (isa=".join "|",(@{*{"${class}::ISA"}{ARRAY}}).")\n" if DEBUG;
-        if ($superclass) {
+	warn "need to create it" if DEBUG;
+	$hashref= $incomplete_hashref ? $incomplete_hashref : {};
+	my $superclass= $ {"${class}::_CLASS_ARRAY_SUPERCLASS"};
+	if ($superclass) {
 	    warn "DEBUG: going to call $superclass->class_array_namehash(undef, $flag_inherit, $calling_class, 0, \$hashref) where hash has ".(keys %$hashref)." keys" if DEBUG;
 	    $superclass->class_array_namehash(undef, $flag_inherit, $calling_class, 0, $hashref); ## eigentlich würd ein flag anstelle calling_class ja reichen.
 	    warn "DEBUG: now hash has ".(keys %$hashref)." keys" if DEBUG;
 	}
-	for (@{"${class}::_CLASS_ARRAY_PUBLIC_FIELDS"},
+#	use Data::Dumper;
+#	warn "Public: ",Dumper(\@{"${class}::_CLASS_ARRAY_PUBLIC_FIELDS"});
+#	warn "Publica: ",Dumper(\@{"${class}::_CLASS_ARRAY_PUBLICA_FIELDS"});
+        for (@{"${class}::_CLASS_ARRAY_PUBLIC_FIELDS"},
+	     @{"${class}::_CLASS_ARRAY_PUBLICA_FIELDS"},
 	     ($flag_inherit ? @{"${class}::_CLASS_ARRAY_PROTECTED_FIELDS"}: ()),
 	     (($flag_inherit and $calling_class eq $class) ? @{"${class}::_CLASS_ARRAY_PRIVATE_FIELDS"}: ())
 	    ) {
-            if (exists $hashref->{$_}) {
-                die "???????FEHLER DUPLIKAT KEY für '$_' in '$class'";##
-            }
+            #if (exists $hashref->{$_}) {
+            #    warn "DUPLIKAT KEY für '$_' in '$class'";##
+            #} nope just overwrite it. since we first gathered the superclass'es values first, we have to.
             $hashref->{$_}= eval "${class}::$_";
         }
         # save it?
-#        if ($hashname && $hashname ne '1' or $flag_cachehash) {
-	if ($hashname or $flag_cachehash) { # 16.12.03 statt oben. oder, so stimmts glaubs besser.
+	if ($hashname or $flag_cachehash) {
             if ($flag_inherit) {
                 *{"${calling_class}::CLASS_ARRAY_NAMEHASH"}= $hashref;
-warn "DEBUG: saved namehash as ${calling_class}::CLASS_ARRAY_NAMEHASH" if DEBUG;
+		warn "DEBUG: saved namehash as ${calling_class}::CLASS_ARRAY_NAMEHASH" if DEBUG;
             } else {
                 *{"${class}::_CLASS_ARRAY_NAMEHASHFOREXTERNALUSE"}= $hashref;
-warn "DEBUG: saved namehash as ${class}::_CLASS_ARRAY_NAMEHASHFOREXTERNALUSE" if DEBUG;
-            } # ja bissel komisch, obige namen. Gedanke war, .
+		warn "DEBUG: saved namehash as ${class}::_CLASS_ARRAY_NAMEHASHFOREXTERNALUSE" if DEBUG;
+            }
         }
     }
     # create alias for it?
     if ($hashname and $hashname ne '1' and (!$flag_inherit or $hashname ne 'CLASS_ARRAY_NAMEHASH')) {
         *{"${calling_class}::$hashname"}= $hashref;
-        }
-    # (was ist wenn $hashname 1 *ist*? dann reicht eben CLASS_ARRAY_NAMEHASH.  Hum, oben Fehler? 16.12.03
+    }
 
-#     warn "!class_array_namehash: hashref".Dumper($hashref) if DEBUG>=3;
     $hashref
 }
 
@@ -396,7 +430,13 @@ sub transport {
 # }
 
 sub create_fields_and_bless_class {
-    my ($calling_class, $counter, $newpublicfields, $newprotectedfields, $newprivatefields, $class)=@_;
+    my ($calling_class,
+	$counter,
+	$newpublicfields,
+	$newpublicafields,
+	$newprotectedfields,
+	$newprivatefields,
+	$class)=@_;
     no strict 'refs';
 #   if ($namehash and $class ne __PACKAGE__) { # last compare is needed (for -fields creation step) to stop from creating stuff in Class::Array itself
 # ##ç               defined ${"${class}::_CLASS_ARRAY_COUNTER"}) {
@@ -407,7 +447,7 @@ sub create_fields_and_bless_class {
 #       }
 #       %{"${calling_class}::CLASS_ARRAY_NAMEHASH"}= %{"${class}::CLASS_ARRAY_NAMEHASH"};
 #   }
-    for (@$newpublicfields, @$newprotectedfields, @$newprivatefields) {
+    for (@$newpublicfields, @$newpublicafields, @$newprotectedfields, @$newprivatefields) {
         if (defined *{"${calling_class}::$_"}{CODE}) { # coderef exists
             croak __PACKAGE__.": conflicting name `$_': can't create initial member constant";
         } else {
@@ -421,8 +461,9 @@ sub create_fields_and_bless_class {
 #           }
         }
         }
-    warn "    create_fields_and_bless_class: calling_class=$calling_class, newpublicfields=".Data::Dumper::Dumper($newpublicfields).", newprotectedfields=".Dumper($newprotectedfields).", newprivatefields=".Dumper($newprivatefields) if DEBUG;
+#    warn "    create_fields_and_bless_class: calling_class=$calling_class, newpublicfields=".Data::Dumper::Dumper($newpublicfields).", newprotectedfields=".Dumper($newprotectedfields).", newprivatefields=".Dumper($newprivatefields) if DEBUG;
     *{"${calling_class}::_CLASS_ARRAY_PUBLIC_FIELDS"}= $newpublicfields;
+    *{"${calling_class}::_CLASS_ARRAY_PUBLICA_FIELDS"}= $newpublicafields;
     *{"${calling_class}::_CLASS_ARRAY_PROTECTED_FIELDS"}= $newprotectedfields;
     *{"${calling_class}::_CLASS_ARRAY_PRIVATE_FIELDS"}= $newprivatefields; # required for creating name lookup hashes and the like.
     *{"${calling_class}::_CLASS_ARRAY_COUNTER"}= \$counter;
@@ -430,6 +471,50 @@ sub create_fields_and_bless_class {
     *{"${calling_class}::_CLASS_ARRAY_SUPERCLASS"}= \$class;
 }
 
+
+sub createaccessors {
+    my ($calling_class)=@_;
+    no strict 'refs';
+    my $public = *{"${calling_class}::_CLASS_ARRAY_PUBLIC_FIELDS"}{ARRAY};
+    my $publica = *{"${calling_class}::_CLASS_ARRAY_PUBLICA_FIELDS"}{ARRAY};
+    if (!$publica) {
+	croak __PACKAGE__."::createaccessors: class '$calling_class' does not seem to be a Class::Array based class";
+    }
+    my $namehash= $calling_class->class_array_namehash;
+#    use Data::Dumper;
+#    warn "createaccessors: for '$calling_class', namehash=",Dumper($namehash),", public= ",Dumper($public),", publica=",Dumper($publica);
+    for (@$public, @$publica) {
+#	warn "loop: $_";
+	my $methodbasename= lcfirst($_);
+	if (not defined *{"${calling_class}::$methodbasename"}{CODE}) {
+	    *{"${calling_class}::$methodbasename"} = eval 'sub { shift->['.$namehash->{$_}.'] }';
+	    die if $@;
+	    #warn "did create '${calling_class}::$methodbasename'";
+	}
+	if (not defined *{"${calling_class}::set_$methodbasename"}{CODE}) {
+	    *{"${calling_class}::set_$methodbasename"} = eval 'sub {my $s=shift; ($$s['.$namehash->{$_}.'])=@_ }';
+	    die if $@;
+	    #warn "did create '${calling_class}::set_$methodbasename'";
+	}
+    }
+}
+
+sub end {# or finalize or so.
+    my $calling_class=caller;
+    createaccessors($calling_class);
+}
+
+# "callback" on reading the class.  ps. this should not be done by a method here, but in a different axe (would that be mop like?)
+sub class_array_conformize {
+    shift;
+    # if a all-lowercase fieldname is given, upcase the first letter
+    my ($name)=@_;
+    if (lc($name) eq ($name)) {
+	ucfirst($name)
+    } else {
+	$name
+    }
+}
 
 # default constructor:
 sub new {
