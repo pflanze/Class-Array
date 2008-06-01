@@ -9,7 +9,7 @@ package Class::Array;
 # $Id: Array.pm,v 1.26 2003/04/11 16:49:12 chris Exp $
 
 
-$VERSION = '0.06b2';
+$VERSION = '0.10pre1';
 
 use strict;
 use Carp;
@@ -192,7 +192,13 @@ sub import {
         }
 
     } else {  # 'normal' use of a class without inheriting it.
-        croak "$class is of no use without defining fields on top of it" unless defined ${"${class}::_CLASS_ARRAY_SUPERCLASS"}; # don't simply test '$class eq __PACKAGE__' since this would stop one to extent Class::Array itself.
+        croak "$class is of no use without defining fields on top of it"
+	  unless do {
+	      no strict 'refs';
+	      defined ${"${class}::_CLASS_ARRAY_SUPERCLASS"};
+	  };
+	# don't simply test '$class eq __PACKAGE__' since this would
+	# stop one to extent Class::Array itself.
         alias_fields ($class, $calling_class, $flag_onlyfields ? { map { $_=> 1 } @only_fields } : undef, 
             $flag_nowarn, 0);
         if ($namehash) { # create (if needed) and import name lookup hash (and cache it)
