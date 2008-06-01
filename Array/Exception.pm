@@ -6,7 +6,7 @@ package Class::Array::Exception;
 # (christian jaeger, cesar keller, philipp suter, peter rohner)
 # Published under the terms of the GNU General Public License
 #
-# $Id: Exception.pm,v 1.4 2002/04/07 17:46:54 chris Exp $
+# $Id: Exception.pm,v 1.5 2002/04/07 18:03:51 chris Exp $
 
 =head1 NAME
 
@@ -91,7 +91,7 @@ Error.pm uses 'throw' to rethrow an exception (as does C++).)
 
 =item ethrow ([ caller_i ])
 
-=item throwe ([ caller_i ])
+=item throw_existing ([ caller_i ])
 
 These do the same (I didn't find a really good name for them yet,
 I would like to just use 'throw' for that purpose but that's already
@@ -201,14 +201,14 @@ sub throw {
 	}
 }
 
-sub throwe { # throw existing  (erase rethrow data before doing so)
+sub throw_existing { # throw existing  (erase rethrow data before doing so)
 	my $self=shift;
 	undef $self->[ExceptionRethrown];# or $self->[ExceptionRethrown]=[];
 	@$self[ExceptionPackage,ExceptionFile,ExceptionLine]= caller(@_);
 	die $self
 }
 
-sub ethrow { # same as throwe
+sub ethrow { # same as throw_existing
 	my $self=shift;
 	undef $self->[ExceptionRethrown];# or $self->[ExceptionRethrown]=[];
 	@$self[ExceptionPackage,ExceptionFile,ExceptionLine]= caller(@_);
