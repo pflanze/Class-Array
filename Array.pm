@@ -9,7 +9,7 @@ package Class::Array;
 # $Id: Array.pm,v 1.26 2003/04/11 16:49:12 chris Exp $
 
 
-$VERSION = '0.06b1';
+$VERSION = '0.06b2';
 
 use strict;
 use Carp;

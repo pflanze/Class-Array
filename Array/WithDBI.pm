@@ -67,10 +67,12 @@ You could call $obj->method_name multiple times before re-executing
 the statement handle if the result
 set contains multiple rows (but usually that won't make sense).
 
-=item make_sthreader( $statementhandle [, values_to_return ])
+=item make_sthreader( sub { my($secondstagesub)=@_; $foo= $secondstagesub}, "somedescriptivemethodname", $statementhandle [, values_to_return ])
 
 Functional: returns the code ref doing the exact same as the above;
 unlike create_sthreader, it does not save it into the caller package.
+The calling class is ignored (both the caller and the $class argument
+values).
 
 =back
 
@@ -97,7 +99,7 @@ use strict;
 no strict 'refs';
 
 sub make_sthreader {
-    my $class=shift;
+    shift;# class, but ignored.
     #my $opt_assign_to=shift; # a glob or scalar ref, where the 2nd stage closure is assigned to.  ##ah, untercheiden nötig?!  ah bessere idee, viel besser:
     my $assign_2ndstage=shift; # must be 1ary procedure, gets new closure, must store it.
     my $methodname=shift; # only informational
