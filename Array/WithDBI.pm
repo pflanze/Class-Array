@@ -6,14 +6,77 @@ package Class::Array::WithDBI;
 # (christian jaeger, cesar keller, philipp suter, peter rohner)
 # Published under the terms of the GNU General Public License
 #
-# $Id: WithDBI.pm,v 1.5 2002/04/02 14:28:02 chris Exp $
+# $Id: WithDBI.pm,v 1.6 2002/04/15 03:46:19 chris Exp $
 
 =head1 NAME
 
-Class::Array::WithDBI 
+Class::Array::WithDBI - setting objects from DBI statement handles
+
+=head1 SYNOPSIS
+
+ my $sth;
+ use EL::DB sub {
+     $sth = $DB->prepare("select  *  from ....");
+ };
+ # EL::DB is currently part of ETHLife CMS.
+ # You could as well just 
+ #  my $sth= $dbh->prepare("select  *  from ....");
+ # (EL::DB will take care of re-preparing them after re-connects 
+ #  i.e. after a fork, though)
+ Some::Class:DerivedFrom::WithDBI->create_sthreader("set_by_fileidArticle", $sth);
+ 
+ # now:
+ my $obj= new Some::Class:DerivedFrom::WithDBI;
+ $sth->execute("some", "params");
+ $obj->set_by_fileidArticle;
+ # now the fields from $obj are set to the values of the fields
+ # with the same name from the query.
 
 =head1 DESCRIPTION
 
+Makes it easier (and faster) to load sql database content into a Class::Array
+based object than it would be to do it manually.
+
+=head1 CLASS METHODS
+
+=over 4
+
+=item create_sthreader( method_name, $statementhandle)
+
+Creates a new method with the name 'method_name' in the class
+on which you call create_sthreader. When called, this method
+figures out which column names the query is returning, and maps
+their values onto the object's fields of the same name.
+It creates a sub that's optimized for just this statement handle,
+so it doesn't have to do any lookups or loops during regular use
+and so apart from the additional method call calling
+
+ $obj->method_name
+ 
+should be as fast as a manual
+
+ @$obj[A,Few,Field,Names]= $sth->fetchrow_array
+
+and should be much easier to handle.
+It returns a list of those column values that don't have a
+corresponding object field, in the same order as they appear
+in the result set.
+
+You could call $obj->method_name multiple times before re-executing
+the statement handle if the result
+set contains multiple rows (but usually that won't make sense).
+
+=back
+
+=head1 NOTES
+
+If your database tables have different column names than your
+objects or if you make a join from multiple tables, it could
+be necessary to use name aliasing in the query (like "select
+wrongname as CorrectName,...").
+
+Tested only with MySql but should work with all database drivers
+that return a correct $sth->{NAME}.
 
 =cut
 
@@ -38,23 +101,7 @@ sub create_sthreader {
 		my $self=shift;
 		my $class= ref($self) or croak("$methodname: Object method called without object");
 		my $fields= $sth->{NAME} or Carp::croak("could not get NAME hash from statement handle - did you execute it? Stopped");
-		my $lookuphash= $class->class_array_namehash(undef,undef,scalar caller); #do {
-#			my $calling_class= caller;
-# 			if ($calling_class eq $class) { # creation of sthreader in class itself. So we also want protected fields and our own private fields.
-# 				if (*{"${class}::CLASS_ARRAY_NAMEHASH"}{HASH}) {
-# 					*{"${class}::CLASS_ARRAY_NAMEHASH"}{HASH}
-# 				} else {
-# 					$class->create_namehash(1, $calling_class);
-# 				}
-# 			} else { # we create the sthreader from outside the class.    Should we distinguish whether we have inherited that class, or are completely outside so we don't know protected fields?
-# 				if ($calling_class->isa($class)) {
-# 					$class->create_namehash(1, $calling_class); # $class ne $calling_class
-# 				} else {
-# 					$class->create_namehash
-# 				}
-# 			}
-#		};
-
+		my $lookuphash= $class->class_array_namehash(undef,undef,scalar caller); 
 		my $idx;
 		my $retidx=0;
 		my @segments;
@@ -149,98 +196,3 @@ sub create_sthreader {
 
 
 1;
-
-__END__
-
-sub {
-	my $self=shift;
-	my @retv;
-	($self->[],$retv[],) = $sth->fetchrow_array;
-	@retv
-}
-
-
-# stage 0: call of create_set_from_sth:
-#	create first stage handler
-
-# first stage: (first call to the created method)
-#	read colnames from $sth and create another eval from it. Replace itself with that one.
-#	
-
-
-# Ich *benötige* den hash, weil sonst, per eval, isses eben doch evtl gefahrlich weil 
-# subs ausgefurht werden konnen die nicht sollten.?
-
-----
-Sat,  9 Mar 2002 18:42:38 +0100
-
-Shit massiver Fehler:
-
-$lookuphash ab arrays bilden geht nicht, da die inherited felder dann unbekannt sind.
-
-
-#Zurückspeichern:
-
---
-
-Also neues Konzept needed für das hash zeugs.
-
-- in alias_fields drin?
-
-
-
-
-
-
-
-
-
-
-Die neue Idee:
-ein EL::DB Teil.
-
-->prepare
-dann
-
-
-
-Weil mehrere Quellen speichern.
-->create_saver( class1,class2, 'Id','Bla','Bleh');
-->save_with_values_from($obj1, $obj2, $value0,$value1,$value2);
-
-Aber: bei select krieg ich von der db  nach dem execute aber vor dem fetch  die kolonnen.
-Beim saven geht das doch gar nich!!!!!!
-
-D.h. ich muss beim creator die Feldreihenfolge angeben.
-
-->create_saver('save_blabla', [class1, @fields], [class2, @fields2], 'Id','Bla','Bleh');
-
-Aber brauch ich wirklich einen saver creator?
-Sonst muss ich halt immer checken ob dieselben fields oder andere das ist müll. Also doch.
-
-dann
-$sth->save_blabla
-(Aber he: ich kann ja ab dem sth das caching determinieren? hash mit $dbh als key? Aber nein, dann gingen nur eine savemethode pro $sth.(Das
-ist zwar auch der normalfall)
-
-Hmm was wenn einfach selber Klassen schreiben für jeden $sth?
-
-package EL::Sth::Hubaru;
-my $hubaru= $DB->prepare(..);
-sub executewith {
-	my $self=shift; (brauchts ja gar nich weil eh klar iss dass hubaru hierhin gehört?
-	
-}
-
-oder
-
-package EL::Sth::Hubaru;
-(nun kommt wieder der scheiss von fahlkonstruktion voin dbi in die quere)
-(weil wenn ich beim prepare automatisch blessen wollte dann....) 
-(Aber es geht ja so:)
-my $hubaru= $DB->prepare(..);
-bless $hubaru;
-sub executewith {
-	my $self=shift; (brauchts ja gar nich weil eh klar iss dass hubaru hierhin gehört?
-	
-}

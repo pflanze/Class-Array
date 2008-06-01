@@ -6,7 +6,7 @@ package Class::Array::Exception;
 # (christian jaeger, cesar keller, philipp suter, peter rohner)
 # Published under the terms of the GNU General Public License
 #
-# $Id: Exception.pm,v 1.5 2002/04/07 18:03:51 chris Exp $
+# $Id: Exception.pm,v 1.6 2002/04/24 16:35:58 chris Exp $
 
 =head1 NAME
 
@@ -30,11 +30,11 @@ Class::Array::Exception - exception base class
      catch Some::Other::Exception, Foreign::Exception {
          print LOG "Some other exception that I know of: $@";
      }
-     otherwise {
+     catch * {
          print LOG "Some unknown exception or error: $@";
      }
  }
- otherwise {
+ catch * {
      print LOG $@;
  }
  finally {
@@ -49,7 +49,7 @@ acting similar to Error.pm.
 Whenever a subclass of Class::Array::Exception is use'd,
 it invokes a perl source filter (Error::Filter) that 
 translates try, catch, otherwise and finally keywords to native perl.
-For details L<Error::Filter>.
+For details see L<Error::Filter>.
 
 Class::Array::Exception defines a few public fields (sorry
 about the namespace pollution, should I keep them protected?):
@@ -62,7 +62,8 @@ about the namespace pollution, should I keep them protected?):
     ExceptionRethrown   True if rethrown (is an array ref)
 
 The class is overloaded so you can simply access $@ in string
-or number context and get a nice error summary or the ExceptionValue.
+or number context and get a nice error summary or the ExceptionValue
+respectively.
 
 =head1 CLASS METHODS
 
@@ -107,11 +108,12 @@ For caller_i see 'new'/'throw'.
 Records package, file and line where rethrow is called from
 into ExceptionRethrown and then calls die. 
 
-NOTE: this method is currently used by Error::Filter;
-maybe I should instead just use 'throw' 
-to make it easier to use Error::Filter with
-Error::Simple (as Error.pm replacement).
-I've already made 'throw' a hybrid class/object method for this reason.
+=item stringify
+
+=item value
+
+The two methods used for overloading in string or number context.
+Override them if you want.
 
 =back
 
@@ -123,7 +125,7 @@ Christian Jaeger, pflanze@gmx.ch
 
 
 use strict;
-require Error::Filter;
+require Error::Filter; # we don't need to be filtered here so don't use it.
 
 use Class::Array -fields=> qw(
 -public
@@ -139,7 +141,6 @@ use Class::Array -fields=> qw(
 
 use overload (
 	'""'	   =>	'stringify',
-	'.'	       =>	'stringify', # since we don't fallback anymore / make call path a bit shorter :)
 	'0+'	   =>	'value',
 	'bool'     =>   sub (){1}, # short cut this segfaulting bool 
 	'fallback' =>	1  # 1 will give segfaults under 5.6.1 when falling back from boolean test, and since the fallen back boolean operation would probably be slow anyway, be sure to test for ref($@) *first* and only after that for trueness ($@ seems to never be undef so you can't test for that)
@@ -149,13 +150,13 @@ sub import {
 	my $class=shift;
 	my $caller=caller;
 	$class->SUPER::import(-caller=> $caller, @_);
-	no strict 'refs';
-	if (${"${caller}::".__PACKAGE__."::filtered"}) {
-		#print "$caller Already filtered\n";
-	} else {
-		Error::Filter->import(1);
-		${"${caller}::".__PACKAGE__."::filtered"}=1;
-	}
+#	no strict 'refs';
+#	if (${"${caller}::".__PACKAGE__."::filtered"}) {
+#		#print "$caller Already filtered\n";
+#	} else {
+		Error::Filter->import;
+#		${"${caller}::".__PACKAGE__."::filtered"}=1;
+#	}
 }
 
 sub new {
@@ -225,6 +226,7 @@ sub stringify {
 	my $self=shift;
 	ref($self).
 	(defined $self->[ExceptionText] ? ": $self->[ExceptionText]" : "").
+	(defined $self->[ExceptionValue] ? " ($self->[ExceptionValue])" : "").
 	( defined($$self[ExceptionFile]) and !defined($self->[ExceptionText]) || $self->[ExceptionText]!~/\n/s
 		? " at $self->[ExceptionFile] line $self->[ExceptionLine].\n".
 			join("",map { "\t...rethrown at $_->[1] line $_->[2]\n" } @{$self->[ExceptionRethrown]})

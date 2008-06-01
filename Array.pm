@@ -6,10 +6,10 @@ package Class::Array;
 # (christian jaeger, cesar keller, philipp suter, peter rohner)
 # Published under the same terms as perl itself (i.e. Artistic license/GPL)
 #
-# $Id: Array.pm,v 1.18 2002/04/02 14:28:02 chris Exp $
+# $Id: Array.pm,v 1.19 2002/04/24 16:37:57 chris Exp $
 
 
-$VERSION = '0.04pre12';
+$VERSION = '0.04pre13';
 
 use strict;
 use Carp;
@@ -129,7 +129,14 @@ sub import {
 	} elsif ($flag_extend) {  # Inherit a class
 		no strict 'refs';
 		my $counter= ${"${class}::_CLASS_ARRAY_COUNTER"};
-		croak __PACKAGE__.": class $class doesn't seem to be a Class::Array type class" unless defined $counter;
+		unless (defined $counter) {
+			if ($class eq __PACKAGE__) {
+				croak __PACKAGE__.": please use the '-fields' argument instead of '-extend' for deriving from the Class::Array base class";
+				# (Hmm, does it really make sense?, should we just drop the '-fields' arg in favour of -extend in all cases?)
+			} else {
+				croak __PACKAGE__.": class $class doesn't seem to be a Class::Array type class";
+			}
+		}
 		create_fields_and_bless_class ($calling_class, $counter, \@newpublicfields, \@newprotectedfields, \@newprivatefields, $class);
 		if (#$class ne __PACKAGE__) {
 				defined ${"${class}::_CLASS_ARRAY_COUNTER"}) {
