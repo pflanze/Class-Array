@@ -394,9 +394,11 @@ sub record_stacktrace {
 						[ caller($i), ## should we check if caller is '(eval)' so we don't waste memory copying stale args? 8//
 							[	
 								map {
-									ref() ? 
+									defined() ?
+									  (ref() ?
 										"r$_"
-										: "s".substr($_,0,$Class::Array::Exception::stacktrace_maxarglen+1)
+										: "s".substr($_,0,$Class::Array::Exception::stacktrace_maxarglen+1))
+									    : "rundef"
 								}
 								@DB::args <= $Class::Array::Exception::stacktrace_nargs ? 
 									@DB::args 

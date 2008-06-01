@@ -6,10 +6,10 @@ package Class::Array;
 # (christian jaeger, cesar keller, philipp suter, peter rohner)
 # Published under the same terms as perl itself (i.e. Artistic license/GPL)
 #
-# $Id: Array.pm,v 1.22 2002/11/10 02:55:13 chris Exp $
+# $Id: Array.pm,v 1.24 2003/04/01 09:18:59 chris Exp $
 
 
-$VERSION = '0.04pre19';
+$VERSION = '0.04pre20';
 
 use strict;
 use Carp;
@@ -401,7 +401,12 @@ sub new {
 	my $class=shift;
 	bless [], $class;
 }
-
+# default cloner:
+sub clone {
+    my $self=shift;
+    my @new=@$self;
+    bless \@new,ref($self)
+}
 # default destructor: (this is needed so subclasses can call ->SUPER::DESTROY regardless whether there is one or not)
 sub DESTROY {
 }
