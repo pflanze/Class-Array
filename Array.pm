@@ -6,10 +6,10 @@ package Class::Array;
 # (christian jaeger, cesar keller, philipp suter, peter rohner)
 # Published under the same terms as perl itself (i.e. Artistic license/GPL)
 #
-# $Id: Array.pm,v 1.13 2001/12/27 12:33:54 chris Exp $
+# $Id: Array.pm,v 1.14 2002/03/09 18:26:50 chris Exp $
 
 
-$VERSION = '0.04pre1';
+$VERSION = '0.04pre2';
 
 use strict;
 use Carp;
@@ -107,35 +107,45 @@ sub import {
 		croak __PACKAGE__.": you can't give both -fields and -onlyfields options";
 	} elsif ($flag_fields) {  # set up $calling_class as base class
 		my $counter=0; ##PS. könnte bei 1 anfangen und ins arrayelement 0 was anderes stopfen...
-		create_fields_and_bless_class ($calling_class, $counter, \@newpublicfields, \@newprotectedfields, \@newprivatefields, $class, $namehash);
-		if ($namehash and $namehash ne 'CLASS_ARRAY_NAMEHASH') { # create alias for name lookup hash (CLASS_ARRAY_NAMEHASH has been created already just 2 lines above)
+		create_fields_and_bless_class ($calling_class, $counter, \@newpublicfields, \@newprotectedfields, \@newprivatefields, $class);
+		if ($namehash) {
 			no strict 'refs';
-			*{"${calling_class}::$namehash"}= *{"${calling_class}::CLASS_ARRAY_NAMEHASH"}{HASH};
+			*{"${calling_class}::CLASS_ARRAY_NAMEHASH"}= $calling_class->create_namehash(1,$calling_class);
+			if ($namehash ne '1' and $namehash ne 'CLASS_ARRAY_NAMEHASH') { # create alias
+				*{"${calling_class}::$namehash"}= *{"${calling_class}::CLASS_ARRAY_NAMEHASH"}{HASH};
+			}
 		}
 
 	} elsif ($flag_extend) {  # Inherit a class
 		no strict 'refs';
 		my $counter= ${"${class}::_CLASS_ARRAY_COUNTER"};
 		croak __PACKAGE__.": class $class doesn't seem to be a Class::Array type class" unless defined $counter;
-		create_fields_and_bless_class ($calling_class, $counter, \@newpublicfields, \@newprotectedfields, \@newprivatefields, $class, $namehash);
+		create_fields_and_bless_class ($calling_class, $counter, \@newpublicfields, \@newprotectedfields, \@newprivatefields, $class);
 		if (#$class ne __PACKAGE__) {
 				defined ${"${class}::_CLASS_ARRAY_COUNTER"}) {
-			alias_fields ($class, $calling_class, $flag_onlyfields ? { map { $_=> 1 } @only_fields } : undef, $flag_nowarn, !$flag_fields);
+			alias_fields ($class, $calling_class, $flag_onlyfields ? { map { $_=> 1 } @only_fields } : undef, 
+				$flag_nowarn, !$flag_fields);
 		}
-		if ($namehash and $namehash ne 'CLASS_ARRAY_NAMEHASH') { # create alias for name lookup hash (CLASS_ARRAY_NAMEHASH has been created already just 2 lines above)
+		if ($namehash) {
 			no strict 'refs';
-			*{"${calling_class}::$namehash"}= *{"${calling_class}::CLASS_ARRAY_NAMEHASH"}{HASH};
+#warn "DEBUG  caller is '$calling_class' but class is '$class'" unless $calling_class eq $class;
+			*{"${calling_class}::CLASS_ARRAY_NAMEHASH"}= $calling_class->create_namehash(1,$calling_class);
+			if ($namehash ne '1' and $namehash ne 'CLASS_ARRAY_NAMEHASH') { # create alias
+				*{"${calling_class}::$namehash"}= *{"${calling_class}::CLASS_ARRAY_NAMEHASH"}{HASH};
+			}
 		}
 
 	} else {  # 'normal' use of a class without inheriting it.
 		croak "$class is of no use without defining fields on top of it" unless defined ${"${class}::_CLASS_ARRAY_COUNTER"}; # don't simply test '$class eq __PACKAGE__' since this would stop one to extent Class::Array itself.
-		alias_fields ($class, $calling_class, $flag_onlyfields ? { map { $_=> 1 } @only_fields } : undef, $flag_nowarn, !$flag_fields);
+		alias_fields ($class, $calling_class, $flag_onlyfields ? { map { $_=> 1 } @only_fields } : undef, 
+			$flag_nowarn, 0);
 		if ($namehash) { # import name lookup hash
-			no strict 'refs';
-			unless (*{"${class}::CLASS_ARRAY_NAMEHASH"}{HASH}) {
-				create_name_lookup_hash($class);
-			}
-			*{"${calling_class}::$namehash"}= *{"${class}::CLASS_ARRAY_NAMEHASH"}{HASH};
+ 			no strict 'refs';
+# 			unless (*{"${class}::CLASS_ARRAY_NAMEHASH"}{HASH}) {
+# 				$class->create_name_lookup_hash;
+# 			}
+# 			*{"${calling_class}::$namehash"}= *{"${class}::CLASS_ARRAY_NAMEHASH"}{HASH};
+			*{"${calling_class}::$namehash"}= $class->create_namehash();
 		}
 	}
 	
@@ -178,6 +188,35 @@ sub alias_fields {
 	} # else something is strange, isn't it? ##
 }	
 
+sub create_namehash { ##replaces create_name_lookup_hash
+# Aufruf a) von neuem class, um eigene UND obenstehende reinzukriegen.  b) von outer, um nur public von der class zu kriegen.
+# Maybe we should also take optional $hashname and $cachehash arguments and put the hash HERE into the CLASS_ARRAY_NAMEHASH var and do aliases
+	my $class=shift;
+	my ($flag_inherit, $calling_class, $incomplete_hashref) =@_; # flag_inherit sagt quasi "ich bin n member und will die protected von oberhalb und meine eigenen protected + private sehen."
+	no strict 'refs';
+	my $hashref= $incomplete_hashref ? $incomplete_hashref : {};
+	my $superclass= do {
+		my $isaref= *{"${class}::ISA"}{ARRAY};
+		if ($isaref and @$isaref == 1) {
+			$isaref->[0]
+		} else {
+			croak __PACKAGE__.": Error: class $class doesn't have a valid \@ISA (multiple inheritance is not supported for Class::Array!)";
+		}
+	};
+	if (defined ${"${superclass}::_CLASS_ARRAY_COUNTER"}) {
+		$superclass->create_namehash($flag_inherit, $calling_class, $hashref); ## eigentlich würd ein flag anstelle calling_class ja reichen.
+	}
+	for (@{"${class}::_CLASS_ARRAY_PUBLIC_FIELDS"}, 
+		($flag_inherit ? @{"${class}::_CLASS_ARRAY_PROTECTED_FIELDS"}: ()),
+		(($flag_inherit and $calling_class eq $class) ? @{"${class}::_CLASS_ARRAY_PRIVATE_FIELDS"}: ())
+	) { 
+		if (exists $hashref->{$_}) {	
+			die "???????FEHLER DUPLIKAT KEY für '$_' in '$class'";##
+		}
+		$hashref->{$_}= eval "${class}::$_";
+	}
+	$hashref
+}	
 
 sub transport {
 	my ($items, $class, $calling_class, $flag_nowarn)=@_;
@@ -243,44 +282,43 @@ sub transport {
 	}
 }
 #use Carp 'cluck';
-sub create_name_lookup_hash { # only call this if needed since it's slow; only call if sure that the given class is Class::Array based.
-	my ($class)=@_;
-#cluck "DEBUG: create_name_lookup_hash for class '$class'";
-	my $superclass;
-	no strict 'refs';
-	for (@{"${class}::ISA"}) {
-		if (defined ${"${_}::_CLASS_ARRAY_COUNTER"}) { # ok it's the class::array based class
-			$superclass=$_;
+# sub create_name_lookup_hash { # only call this if needed since it's slow; only call if sure that the given class is Class::Array based.
+# 	my $class=shift;
+# #cluck "DEBUG: create_name_lookup_hash for class '$class'";
+# 	my $superclass;
+# 	no strict 'refs';
+# 	for (@{"${class}::ISA"}) {
+# 		if (defined ${"${_}::_CLASS_ARRAY_COUNTER"}) { # ok it's the class::array based class
+# 			$superclass=$_;
+# 
+# 			# copy lookup hash from super class
+# 			unless (*{"${superclass}::CLASS_ARRAY_NAMEHASH"}{HASH}) {
+# 				$superclass->create_name_lookup_hash;
+# 			}
+# 			%{"${class}::CLASS_ARRAY_NAMEHASH"}= %{"${superclass}::CLASS_ARRAY_NAMEHASH"};
+# 
+# 			last;# for
+# 		}
+# 	} # else there is no superclass. (Except ("hopefully") Class::Array itself)
+# 	
+# 	# Put members from this class into the hash
+# 	for (@{"${class}::_CLASS_ARRAY_PUBLIC_FIELDS"}, @{"${class}::_CLASS_ARRAY_PROTECTED_FIELDS"}, @{"${class}::_CLASS_ARRAY_PRIVATE_FIELDS"}) {
+# 		${"${class}::CLASS_ARRAY_NAMEHASH"}{$_}= eval "${class}::$_";
+# 	}
+# }
 
-			# copy lookup hash from super class
-			unless (*{"${superclass}::CLASS_ARRAY_NAMEHASH"}{HASH}) {
-				create_name_lookup_hash($superclass);
-			}
-			%{"${class}::CLASS_ARRAY_NAMEHASH"}= %{"${superclass}::CLASS_ARRAY_NAMEHASH"};
-
-			last;# for
-		}
-	} # else there is no superclass. (Except ("hopefully") Class::Array itself)
-	
-	# Put members from this class into the hash
-	for (@{"${class}::_CLASS_ARRAY_PUBLIC_FIELDS"}, @{"${class}::_CLASS_ARRAY_PROTECTED_FIELDS"}, @{"${class}::_CLASS_ARRAY_PRIVATE_FIELDS"}) {
-		${"${class}::CLASS_ARRAY_NAMEHASH"}{$_}= eval "${class}::$_";
-	}
-}
-	
-	
 sub create_fields_and_bless_class {
-	my ($calling_class, $counter, $newpublicfields, $newprotectedfields, $newprivatefields, $class, $namehash)=@_;
+	my ($calling_class, $counter, $newpublicfields, $newprotectedfields, $newprivatefields, $class)=@_;
 	no strict 'refs';
-	if ($namehash and $class ne __PACKAGE__) { # last compare is needed (for -fields creation step) to stop from creating stuff in Class::Array itself
-##ç				defined ${"${class}::_CLASS_ARRAY_COUNTER"}) {
-##der scheiss ist   aber eigtl sollt ichs doch von oben von params her kriegen?
-		# copy nameindex from inherited class.
-		unless (*{"${class}::CLASS_ARRAY_NAMEHASH"}{HASH}) {
-			create_name_lookup_hash($class);
-		}
-		%{"${calling_class}::CLASS_ARRAY_NAMEHASH"}= %{"${class}::CLASS_ARRAY_NAMEHASH"};
-	}
+# 	if ($namehash and $class ne __PACKAGE__) { # last compare is needed (for -fields creation step) to stop from creating stuff in Class::Array itself
+# ##ç				defined ${"${class}::_CLASS_ARRAY_COUNTER"}) {
+# ##der scheiss ist   aber eigtl sollt ichs doch von oben von params her kriegen?
+# 		# copy nameindex from inherited class.
+# 		unless (*{"${class}::CLASS_ARRAY_NAMEHASH"}{HASH}) {
+# 			$class->create_name_lookup_hash;
+# 		}
+# 		%{"${calling_class}::CLASS_ARRAY_NAMEHASH"}= %{"${class}::CLASS_ARRAY_NAMEHASH"};
+# 	}
 	for (@$newpublicfields, @$newprotectedfields, @$newprivatefields) {
 		if (defined *{"${calling_class}::$_"}{CODE}) { # coderef exists
 			croak __PACKAGE__.": conflicting name `$_': can't create initial member constant";
@@ -290,9 +328,9 @@ sub create_fields_and_bless_class {
 			# The following isn't any better. It's accelerated in both cases (perl5.00503). In both cases the constants are valid during global destruction. The following doesn't work if $_ eq 'ç' or some such.
 			#eval "sub ${calling_class}::$_ () { $scalar }"; ## somewhat dangerous, maybe we should check vars
 			#warn "Class::Array: $@ (`$_')" if $@;
-			if ($namehash) {
-				${"${calling_class}::CLASS_ARRAY_NAMEHASH"}{$_}=$scalar;
-			}
+# 			if ($namehash) {
+# 				${"${calling_class}::CLASS_ARRAY_NAMEHASH"}{$_}=$scalar;
+# 			}
 		}
 	}
 	*{"${calling_class}::_CLASS_ARRAY_PUBLIC_FIELDS"}= $newpublicfields;
@@ -468,10 +506,11 @@ as a constant. If you need fast string-to-index lookups, use this option
 to get a hash with the given name into your namespace that has the field
 name strings as keys and the array index as value.
 
-Use this only if needed since it takes both memory and time to create the
-hash.
+Use this only if needed since it takes some time to create the hash.
+(Currently there's no caching of partial stages of the hash in superclasses,
+so memory is not a concern.)
 
-Note that the hash contains all of the public, protected and private fields.
+Note that the hash only has the fields that are accessible to you.
 
 (You could use the reverse of the hash to get the field names for an index,
 i.e. for debugging.)
@@ -542,9 +581,9 @@ Define fields private, if you don't need them to be accessible publically.
 
 =head1 BUGS
 
-SCALARs can't be checked for conflicts/existence. This is due to a strange
-inconsistency in perl (bug? 5.00503 as well as 5.6.1). This will probably
-not affect you much. (Note that constants are not scalars but CODE
+Scalars can't be checked for conflicts/existence. This is due to a strange
+inconsistency in perl (5.00503 as well as 5.6.1). This will probably
+not have much impact. (Note that constants are not SCALARs but CODE
 entries in the symbol table.)
 
 =head1 CAVEATS
@@ -565,7 +604,7 @@ look at it, too.
 
 =head1 AUTHOR
 
-Chris J. <pflanze@gmx.ch>. Published under the same terms as perl itself.
+Christian J. <pflanze@gmx.ch>. Published under the same terms as perl itself.
 
 =head1 SEE ALSO
 
@@ -600,3 +639,27 @@ right away den hash kreieren  fehlt noch. Derzeit führen superklassen stets eval
   aber bei subklassen geht das im Nachhinein ja gar nich mehr?
   Hmmm, muss also private auch in n array schreiben! Weil sons gehts weder mit hash noch array gar nicht in WithDBI.pm.
   
+
+Sat,  9 Mar 2002 18:38:21 +0100
+
+Shit fehler:
+
+die private fields dürfen natürlich nicht in namelookuphash sein der Klasse obendran. Sondern nur im
+hash der Klasse selber, wenn überhaupt. D.h. das hashkopieren geht nich so. Halt 3 verschiedene hashes
+machen, einer mit allen für Gebrauch in Klasse selber, einer nur mit public für export nach draussen,
+und einer mit public und protected für inheritance.
+
+Oder: innerhalb der Klasse immer alle public+protected von superklassen  und die private von selber
+drin haben.  Dann für inheritance nich einfach hash kopieren sondern checken ob's ein private ist und 
+wenn ja, nicht kopieren.   Für export checken ob public sonst verwerfen. Gleich wie beim Export der Konstanten.
+Das führt mich zur Frage ob überhaupt der Export bisher korrekt war?!!! Ob public von superklassen exportiert
+wurden oder nicht.
+digdig. Hmm doch es wurde rekursiv erledigt. ABER: dafür seh ich keinen Unterschied zwischen export nach aussen
+und export für inheritance.!!!
+Tatsächlich, protected fields werden auch exportiert. Nur private nicht.
+Aha, das war aber nur ein kleiner copypaste bug von mir. War alles schon vorbereitet.
+Oky, nun geflickt.
+
+--
+Neu: zusammen mit dem alias_fields erledigen. Gleich in das hash stecken.
+Oder eben doch separat, dann aber gleiches Prinzip.
