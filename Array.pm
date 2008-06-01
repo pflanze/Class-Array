@@ -9,7 +9,7 @@ package Class::Array;
 # $Id: Array.pm,v 1.26 2003/04/11 16:49:12 chris Exp $
 
 
-$VERSION = '0.05pre6';
+$VERSION = '0.05pre7';
 
 use strict;
 use Carp;
@@ -570,19 +570,19 @@ sub DESTROY {
 }
 
 
-sub dump {
-    my $s=shift;
-    # eruiere visible fields
-    my $caller=caller;
-    #my $namehash= $s->class_array_namehash(undef,undef,$caller);
-    # nope. mannn muss doch schon was geben?
-    # all publicly available fields only?
-    # oder soll ich echt einfach durch alle Felder gehen, sie dann nach priv/prot/publ zusammenfassen öh  unddann ausgeben regardless of feldname? fully qualified feldname geben?
-    # eigentlich will ich ne darstellung  mit feld konstanten? non fully qual optional
-    die "unfinishedç"
-#    use Data::Dumper;
-#    Dumper $namehash
-}
+# sub dump {
+#     my $s=shift;
+#     # eruiere visible fields
+#     my $caller=caller;
+#     #my $namehash= $s->class_array_namehash(undef,undef,$caller);
+#     # nope. mannn muss doch schon was geben?
+#     # all publicly available fields only?
+#     # oder soll ich echt einfach durch alle Felder gehen, sie dann nach priv/prot/publ zusammenfassen öh  unddann ausgeben regardless of feldname? fully qualified feldname geben?
+#     # eigentlich will ich ne darstellung  mit feld konstanten? non fully qual optional
+#     die "unfinishedç"
+# #    use Data::Dumper;
+# #    Dumper $namehash
+# }
 
 
 sub class_array_publica_fields {
@@ -614,6 +614,8 @@ sub dump_publica {
 	"  $method: ".Chj::singlequote($s->$method)."\n"
     } $s->class_array_publica_fields)
 }
+
+*dump= *dump_publica; # as long as we don't have a better dump method; note that I'm almost always using publica fields now, so that's just fine for me most of the time..
 
 1;
 __END__
