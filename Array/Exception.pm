@@ -93,10 +93,10 @@ for this purpose though, since it expresses better what it does.
 'throw' is only a hybrid class/object method since
 Error.pm uses 'throw' to rethrow an exception (as does C++).)
 
-=item set_stacktrace( false/true [, 0/n [, true/false [, stacktrace_maxarglen]]] )
+=item set_stacktrace( false/true [, true/false [, 0/stacktrace_nargs [, stacktrace_maxarglen]]] )
 
 Sets the value of $Class::Array::Exception::stacktrace [and
-$Class::Array::Exception::stacktrace_nargs, ...::stacktrace_output 
+$Class::Array::Exception::stacktrace_output, ...::stacktrace_nargs
 and ...::stacktrace_maxarglen].
 (Using an inheritable method seems cooler for this purpose since
 users of your derived exception class don't have to remember that your
@@ -106,16 +106,16 @@ First argument:
 false (which is the default) means that the 'ExceptionStacktrace' will not
 be set upon throwing an exception (which will be faster). 
 
-Second argument (defaults to 10):
+Second argument:
+true (which is the default) means that the stacktrace will 
+also be included in the output of 'stringify' (if you happen to override 
+stringify, you should make it append the output of the 'stacktrace' object method)
+
+Third argument (defaults to 10):
 0 means that 'ExceptionStacktrace'
 will be set to contain only the caller information (subroutine arguments),
 a higher value means that also up to the n first subroutine arguments of each stack 
 frame will be included in 'ExceptionStacktrace' as array ref in column 10.
-
-Third argument:
-true (which is the default) meant that the stacktrace will 
-also be included in the output of 'stringify' (if you happen to override 
-stringify, you should make it append the output of the 'stacktrace' object method)
 
 Forth argument: the maximum length output of each string subroutine argument (default: 10).
 
@@ -213,9 +213,9 @@ sub import {
 	}
 }
 
-use vars qw/$stacktrace $stacktrace_nargs $stacktrace_output $stacktrace_maxarglen/;
-$stacktrace_nargs= 10;
+use vars qw/$stacktrace $stacktrace_output $stacktrace_nargs $stacktrace_maxarglen/;
 $stacktrace_output=1;
+$stacktrace_nargs= 10;
 $stacktrace_maxarglen= 10;
 
 sub set_stacktrace {
@@ -223,9 +223,9 @@ sub set_stacktrace {
 	if (@_) {
 		$stacktrace=shift;
 		if (@_) {
-			$stacktrace_nargs= shift;
+			$stacktrace_output= shift;
 			if (@_) {
-				$stacktrace_output= shift;
+				$stacktrace_nargs= shift;
 				if (@_) {
 					$stacktrace_maxarglen= shift;
 				}
