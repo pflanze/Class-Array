@@ -47,9 +47,9 @@ Base class for building Class::Array based Exception classes
 acting similar to Error.pm.
 
 Whenever a subclass of Class::Array::Exception is use'd,
-it invokes a perl source filter (Class::Array::ExceptionFilter) that 
+it invokes a perl source filter (Error::Filter) that 
 translates try, catch, otherwise and finally keywords to native perl.
-For details L<Class::Array::ExceptionFilter>.
+For details L<Error::Filter>.
 
 Class::Array::Exception defines a few public fields (sorry
 about the namespace pollution, should I keep them protected?):
@@ -107,9 +107,9 @@ For caller_i see 'new'/'throw'.
 Records package, file and line where rethrow is called from
 into ExceptionRethrown and then calls die. 
 
-NOTE: this method is currently used by Class::Array::ExceptionFilter;
+NOTE: this method is currently used by Error::Filter;
 maybe I should instead just use 'throw' 
-to make it easier to use Class::Array::ExceptionFilter with
+to make it easier to use Error::Filter with
 Error::Simple (as Error.pm replacement).
 I've already made 'throw' a hybrid class/object method for this reason.
 
@@ -123,7 +123,7 @@ Christian Jaeger, pflanze@gmx.ch
 
 
 use strict;
-require Class::Array::ExceptionFilter;
+require Error::Filter;
 
 use Class::Array -fields=> qw(
 -public
@@ -153,7 +153,7 @@ sub import {
 	if (${"${caller}::".__PACKAGE__."::filtered"}) {
 		#print "$caller Already filtered\n";
 	} else {
-		Class::Array::ExceptionFilter->import;
+		Error::Filter->import(1);
 		${"${caller}::".__PACKAGE__."::filtered"}=1;
 	}
 }

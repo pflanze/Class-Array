@@ -3,34 +3,3 @@ The usual
   make
   make install
 
-*except* for one thing: if you want to use Class::Array::Exception or 
-Class::Array::ExceptionFilter, you have to install a patched version of
-Filter::Simple. I've taken care I don't disturb the usual operation of the
-patched version, so you should be able to just overwrite your existing
-installation without other applications to break.
-
-  I also recommend that you install a patched version of Text::Balanced,
-since the upstream version as of 2 Apr 2002 does have a bug in it's heredoc
-handling, which I didn't know how to fix correctly but did a fix that seems
-to work well enough.
-
-  Patch installation instructions:
-  (Note that this assumes that the current versions on cpan 
-  are still 0.77 or 1.89, or are still patcheable)
-
-perl -MCPAN -eshell
-get Text::Balanced
-get Filter::Simple
-exit (or is it quit? Ctrl-D)
-
-cd CPANBASEDIR/build/Filter-Simple-0.77
-patch -p0 < PATH_TO/Filter-Simple.cj.diff
-perl Makefile.PL
-make install
-
-cd CPANBASEDIR/build/Text-Balanced-1.89
-patch -p0 < PATH_TO/Text-Balanced.cj.diff
-perl Makefile.PL
-make install
-
-(CPANBASEDIR is usually something like /root/.cpan)

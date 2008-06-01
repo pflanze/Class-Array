@@ -1,5 +1,3 @@
 Make perl5 better for object oriented programming
 
 Fast objects with access rules and typo protection.
-
-Fast exception handling in real try/catch/finally manner.
