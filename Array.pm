@@ -9,14 +9,14 @@ package Class::Array;
 # $Id: Array.pm,v 1.26 2003/04/11 16:49:12 chris Exp $
 
 
-$VERSION = '0.05pre1';
+$VERSION = '0.05pre2';
 
 use strict;
 use Carp;
 
 #use constant DEBUG=>0;
 sub DEBUG () {$ENV{CLASS_ARRAY_DEBUG}||0};
-#$|=1 if DEBUG;
+$|=1 if DEBUG;
 
 #use enum qw(PUBLIC PROTECTED PRIVATE);
 sub PUBLIC () {0}; sub PROTECTED () {1}; sub PRIVATE () {2}; # enum is not in the base perl 5.005 dist
@@ -189,22 +189,62 @@ sub alias_fields {
                 }
             }
         }
-        my $superclass= ${"${class}::_CLASS_ARRAY_SUPERCLASS"}
-            or croak __PACKAGE__.": Error: class $class is set up as Class::Array type class except that _CLASS_ARRAY_SUPERCLASS is not defined";
+    my $superclass= ${"${class}::_CLASS_ARRAY_SUPERCLASS"};
+    warn  "! ${class}::_CLASS_ARRAY_SUPERCLASS =$superclass\n" if DEBUG;
+
+        unless ( $superclass ) {
+	    my $isaref= *{"${class}::ISA"}{ARRAY};
+	    #print STDERR "! ${class}::ISA = ".(join ",",@$isaref )."\n";
+	    if ($isaref and @$isaref >= 1) {
+		$superclass =  ${$isaref}[0];
+	    }
+	}
+        $superclass or do { 
+	    warn __PACKAGE__.": Error: class $class is set up as Class::Array type class except that _CLASS_ARRAY_SUPERCLASS is not defined" unless $class eq 'Class::Array';     ### don't warn when class = Class::Array, happens often
+	    return;
+	};
+
         alias_fields ( $superclass, $calling_class, $only_fields, $flag_nowarn, $flag_inherit);
     } # else something is strange, isn't it? ##
 }
 
 #use Carp 'cluck';
 
-sub class_array_namehash { ##replaces create_name_lookup_hash
+# von theaterblut:
+sub class_array_namehash_allprotected { # get all protected field definitions in the given package/package of given object, regardless of caller
+    my $proto=shift;
+    my $class= ref($proto)||$proto; #minimal gefahrlich 
+    #warn "class_array_namehash_allprotected: class=$class";
+    my $hashref;
+    no strict 'refs';
+    if ($hashref= *{"${class}::_CLASS_ARRAY_NAMEHASHALLPROTECTED"}{HASH}) {
+	#warn "reuse cached hash";
+    } else {
+	$hashref={}; # könnte es ja sein dass gar nirgends protected fields sind!
+	my $workclass=$class;
+	do {
+	    #warn "class_array_namehash_allprotected: werde über \@${workclass}::_CLASS_ARRAY_PROTECTED_FIELDS loopen..";
+	    for (@{"${workclass}::_CLASS_ARRAY_PROTECTED_FIELDS"}) {
+		$hashref->{$_}= eval "${workclass}::$_";
+		#warn "class_array_namehash_allprotected: did set name '$_' to $hashref->{$_}";
+	    }
+	} while ($workclass= ${"${workclass}::_CLASS_ARRAY_SUPERCLASS"});
+	*{"${class}::_CLASS_ARRAY_NAMEHASHALLPROTECTED"}= $hashref;
+    }
+    return $hashref
+}
+
+sub class_array_namehash { ##replaces create_name_lookup_hash   # ps. doch eher $class->Class::Array::namehash nennen?
 # Aufruf a) von neuem class, um eigene UND obenstehende reinzukriegen.  b) von outer, um nur public von der class zu kriegen.
 # Maybe we should also take optional $hashname and $cachehash arguments and put the hash HERE into the CLASS_ARRAY_NAMEHASH var and do aliases
     my $class=shift;
     my ($hashname, $flag_inherit, $calling_class, $flag_cachehash, $incomplete_hashref) =@_; # flag_inherit sagt quasi "ich bin n member und will die protected von oberhalb und meine eigenen protected + private sehen."
     $calling_class= caller unless defined $calling_class;
-    $flag_inherit= $calling_class->isa($class) unless defined $flag_inherit; ##korrekt?
+#    $flag_inherit= $calling_class->isa($class) unless defined $flag_inherit; ##korrekt?
 #warn "-d1-class_array_namehash: hashhame=$hashname, flag_inherit=$flag_inherit, calling_class=$calling_class, class=$class,flag_cachehash=$flag_cachehash\n" if DEBUG;
+    $flag_inherit= ( $calling_class->isa($class) || $class->isa($calling_class) )
+      unless defined $flag_inherit; ##korrekt?
+warn "-d1-class_array_namehash: hashhame=$hashname, flag_inherit=$flag_inherit, calling_class=$calling_class, class=$class,flag_cachehash=$flag_cachehash\n" if DEBUG;
     no strict 'refs';
     my $hashref;
     # check if not already cached:
@@ -237,20 +277,24 @@ sub class_array_namehash { ##replaces create_name_lookup_hash
             $hashref->{$_}= eval "${class}::$_";
         }
         # save it?
-        if ($hashname && $hashname ne '1' or $flag_cachehash) {
+#        if ($hashname && $hashname ne '1' or $flag_cachehash) {
+	if ($hashname or $flag_cachehash) { # 16.12.03 statt oben. oder, so stimmts glaubs besser.
             if ($flag_inherit) {
                 *{"${calling_class}::CLASS_ARRAY_NAMEHASH"}= $hashref;
 warn "DEBUG: saved namehash as ${calling_class}::CLASS_ARRAY_NAMEHASH" if DEBUG;
             } else {
                 *{"${class}::_CLASS_ARRAY_NAMEHASHFOREXTERNALUSE"}= $hashref;
 warn "DEBUG: saved namehash as ${class}::_CLASS_ARRAY_NAMEHASHFOREXTERNALUSE" if DEBUG;
-            }
+            } # ja bissel komisch, obige namen. Gedanke war, .
         }
     }
     # create alias for it?
     if ($hashname and $hashname ne '1' and (!$flag_inherit or $hashname ne 'CLASS_ARRAY_NAMEHASH')) {
         *{"${calling_class}::$hashname"}= $hashref;
         }
+    # (was ist wenn $hashname 1 *ist*? dann reicht eben CLASS_ARRAY_NAMEHASH.  Hum, oben Fehler? 16.12.03
+
+#     warn "!class_array_namehash: hashref".Dumper($hashref) if DEBUG>=3;
     $hashref
 }
 
