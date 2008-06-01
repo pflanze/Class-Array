@@ -6,7 +6,7 @@ package Class::Array::Exception;
 # (christian jaeger, cesar keller, philipp suter, peter rohner)
 # Published under the terms of the GNU General Public License
 #
-# $Id: Exception.pm,v 1.6 2002/04/24 16:35:58 chris Exp $
+# $Id: Exception.pm,v 1.7 2002/04/26 16:20:57 chris Exp $
 
 =head1 NAME
 
@@ -59,7 +59,8 @@ about the namespace pollution, should I keep them protected?):
     ExceptionPackage    Package,
     ExceptionFile       file and
     ExceptionLine       line from where throw was called.
-    ExceptionRethrown   True if rethrown (is an array ref)
+    ExceptionRethrown   True if rethrown (it's an array ref of
+                        arrayrefs containing all values from 'caller')
 
 The class is overloaded so you can simply access $@ in string
 or number context and get a nice error summary or the ExceptionValue
@@ -115,6 +116,11 @@ into ExceptionRethrown and then calls die.
 The two methods used for overloading in string or number context.
 Override them if you want.
 
+=item text
+
+Returns the contents of the exception as text, without class, line or
+backtrace information (by default "ExceptionText (ExceptionValue)").
+
 =back
 
 =head1 AUTHOR
@@ -150,13 +156,13 @@ sub import {
 	my $class=shift;
 	my $caller=caller;
 	$class->SUPER::import(-caller=> $caller, @_);
-#	no strict 'refs';
-#	if (${"${caller}::".__PACKAGE__."::filtered"}) {
-#		#print "$caller Already filtered\n";
-#	} else {
+	no strict 'refs';
+	if (${"${caller}::".__PACKAGE__."::filtered"}) {
+		#print "$caller Already filtered\n";
+	} else {
 		Error::Filter->import;
-#		${"${caller}::".__PACKAGE__."::filtered"}=1;
-#	}
+		${"${caller}::".__PACKAGE__."::filtered"}=1;
+	}
 }
 
 sub new {
@@ -232,6 +238,12 @@ sub stringify {
 			join("",map { "\t...rethrown at $_->[1] line $_->[2]\n" } @{$self->[ExceptionRethrown]})
 		: ""
 	)
+}
+
+sub text {
+	my $self=shift;
+	(defined $self->[ExceptionText] ? "$self->[ExceptionText]" : "").
+	(defined $self->[ExceptionValue] ? " ($self->[ExceptionValue])" : "(no value)")
 }
 
 sub value {
