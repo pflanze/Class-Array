@@ -1,12 +1,7 @@
 package Class::Array;
 
-# Mon Jul 23 16:31:09 2001  Christian Jaeger, pflanze@gmx.ch
-# 
-# Copyright 2001 by ethlife renovation project people
-# (christian jaeger, cesar keller, philipp suter, peter rohner)
+# Copyright 2001-2008 by Christian Jaeger, christian at jaeger mine nu
 # Published under the same terms as perl itself (i.e. Artistic license/GPL)
-#
-# $Id: Array.pm,v 1.26 2003/04/11 16:49:12 chris Exp $
 
 
 $VERSION = '0.10pre1';
@@ -912,7 +907,8 @@ A: Could it be there is a line 'use Y;' in your X module and you have placed it 
 
 =head1 AUTHOR
 
-Christian J. <pflanze@gmx.ch>. Published under the same terms as perl itself.
+Christian Jaeger <christian at jaeger mine nu>. Published under the
+same terms as perl itself.
 
 =head1 SEE ALSO
 
