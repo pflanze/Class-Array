@@ -1,12 +1,6 @@
 package Class::Array::XMLException;
 
-# Sat Apr 20 18:34:17 2002  Christian Jaeger, pflanze@gmx.ch
-# 
-# Copyright 2001 by ethlife renovation project people
-# (christian jaeger, cesar keller, philipp suter, peter rohner)
-# Published under the terms of the GNU General Public License
-#
-# $Id: XMLException.pm,v 1.3 2002/09/01 01:50:08 chris Exp $
+# Copyright 2001-2008 by Christian Jaeger, christian at jaeger mine nu
 
 =head1 NAME
 
@@ -25,7 +19,7 @@ tag.)
 
 =head1 AUTHOR
 
-Christian Jaeger, pflanze@gmx.ch
+Christian Jaeger, christian at jaeger mine nu
 
 =head1 SEE ALSO
 

@@ -1,12 +1,6 @@
 package Class::Array::Exception;
 
-# Sat Dec 29 11:50:50 2001  Christian Jaeger, pflanze@gmx.ch
-# 
-# Copyright 2001 by ethlife renovation project people
-# (christian jaeger, cesar keller, philipp suter, peter rohner)
-# Published under the terms of the GNU General Public License
-#
-# $Id: Exception.pm,v 1.13 2003/04/11 16:51:49 chris Exp $
+# Copyright 2001-2008 by Christian Jaeger, christian at jaeger mine nu
 
 =head1 NAME
 
@@ -230,7 +224,7 @@ L<Error::Filter>
 
 =head1 AUTHOR
 
-Christian Jaeger, pflanze@gmx.ch
+Christian Jaeger, christian at jaeger mine nu
 
 =cut
 

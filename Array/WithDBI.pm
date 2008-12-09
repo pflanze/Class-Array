@@ -1,12 +1,6 @@
 package Class::Array::WithDBI;
 
-# Fri Mar  8 20:53:40 2002  Christian Jaeger, pflanze@gmx.ch
-# 
-# Copyright 2001 by ethlife renovation project people
-# (christian jaeger, cesar keller, philipp suter, peter rohner)
-# Published under the terms of the GNU General Public License
-#
-# $Id: WithDBI.pm,v 1.7 2003/04/11 16:52:47 chris Exp $
+# Copyright 2001-2008 by Christian Jaeger, christian at jaeger mine nu
 
 =head1 NAME
 
